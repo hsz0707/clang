@@ -1206,6 +1206,7 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
     "i686-pc-linux-gnu",
     "i486-linux-gnu",
     "i386-linux-gnu",
+    "i686-linux-android",
     "i686-redhat-linux",
     "i586-redhat-linux",
     "i386-redhat-linux",
@@ -1216,7 +1217,10 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
   static const char *const MIPSLibDirs[] = { "/lib" };
   static const char *const MIPSTriples[] = { "mips-linux-gnu" };
   static const char *const MIPSELLibDirs[] = { "/lib" };
-  static const char *const MIPSELTriples[] = { "mipsel-linux-gnu" };
+  static const char *const MIPSELTriples[] = {
+    "mipsel-linux-gnu",
+    "mipsel-linux-android"
+  };
 
   static const char *const PPCLibDirs[] = { "/lib32", "/lib" };
   static const char *const PPCTriples[] = {
