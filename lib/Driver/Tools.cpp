@@ -627,7 +627,7 @@ static StringRef getARMFloatABI(const Driver &D,
         // EABI is always AAPCS, and if it was not marked 'hard', it's softfp
         FloatABI = "softfp";
         break;
-      case llvm::Triple::ANDROIDEABI: {
+      case llvm::Triple::ANDROID: {
         StringRef ArchName =
           getLLVMArchSuffixForARM(getARMTargetCPU(Args, Triple));
         if (ArchName.startswith("v7"))
@@ -664,7 +664,7 @@ void Clang::AddARMTargetArgs(const ArgList &Args,
   } else {
     // Select the default based on the platform.
     switch(Triple.getEnvironment()) {
-    case llvm::Triple::ANDROIDEABI:
+    case llvm::Triple::ANDROID:
     case llvm::Triple::GNUEABI:
       ABIName = "aapcs-linux";
       break;
@@ -1272,7 +1272,7 @@ static void addAsanRTLinux(const ToolChain &TC, const ArgList &Args,
   if (!Args.hasFlag(options::OPT_faddress_sanitizer,
                     options::OPT_fno_address_sanitizer, false))
     return;
-  if(TC.getTriple().getEnvironment() == llvm::Triple::ANDROIDEABI) {
+  if(TC.getTriple().getEnvironment() == llvm::Triple::ANDROID) {
     if (!Args.hasArg(options::OPT_shared)) {
       // For an executable, we add a .preinit_array stub.
       CmdArgs.push_back("-u");
@@ -5126,7 +5126,7 @@ void linuxtools::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
 
 static void AddLibgcc(llvm::Triple Triple, const Driver &D,
                       ArgStringList &CmdArgs, const ArgList &Args) {
-  bool isAndroid = Triple.getEnvironment() == llvm::Triple::ANDROIDEABI;
+  bool isAndroid = Triple.getEnvironment() == llvm::Triple::ANDROID;
   bool StaticLibgcc = isAndroid || Args.hasArg(options::OPT_static) ||
     Args.hasArg(options::OPT_static_libgcc);
   if (!D.CCCIsCXX)
@@ -5158,7 +5158,7 @@ void linuxtools::Link::ConstructJob(Compilation &C, const JobAction &JA,
     static_cast<const toolchains::Linux&>(getToolChain());
   const Driver &D = ToolChain.getDriver();
   const bool isAndroid = ToolChain.getTriple().getEnvironment() ==
-    llvm::Triple::ANDROIDEABI;
+    llvm::Triple::ANDROID;
 
   ArgStringList CmdArgs;
 
