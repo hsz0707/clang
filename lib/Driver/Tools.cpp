@@ -5127,12 +5127,12 @@ void linuxtools::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
 static void AddLibgcc(llvm::Triple Triple, const Driver &D,
                       ArgStringList &CmdArgs, const ArgList &Args) {
   bool isAndroid = Triple.getEnvironment() == llvm::Triple::ANDROID;
-  bool StaticLibgcc = isAndroid || Args.hasArg(options::OPT_static) ||
-    Args.hasArg(options::OPT_static_libgcc);
+  bool StaticLibgcc = Args.hasArg(options::OPT_static) ||
+                      Args.hasArg(options::OPT_static_libgcc);
   if (!D.CCCIsCXX)
     CmdArgs.push_back("-lgcc");
 
-  if (StaticLibgcc) {
+  if (StaticLibgcc || isAndroid) {
     if (D.CCCIsCXX)
       CmdArgs.push_back("-lgcc");
   } else {
@@ -5147,6 +5147,9 @@ static void AddLibgcc(llvm::Triple Triple, const Driver &D,
     CmdArgs.push_back("-lgcc_eh");
   else if (!Args.hasArg(options::OPT_shared) && D.CCCIsCXX)
     CmdArgs.push_back("-lgcc");
+
+  if (!StaticLibgcc && isAndroid)
+    CmdArgs.push_back("-ldl");
 }
 
 void linuxtools::Link::ConstructJob(Compilation &C, const JobAction &JA,
