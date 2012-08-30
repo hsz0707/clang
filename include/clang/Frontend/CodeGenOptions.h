@@ -111,6 +111,10 @@ public:
 
   unsigned StackRealignment  : 1; /// Control whether to permit stack
                                   /// realignment.
+
+  unsigned UseInitArray      : 1; ///< Control whether to use .init_array or
+                                  ///< .ctors.
+
   unsigned StackAlignment;        /// Overrides default stack alignment,
                                   /// if not 0.
 
@@ -215,6 +219,7 @@ public:
     UseRegisterSizedBitfieldAccess = 0;
     VerifyModule = 1;
     StackRealignment = 0;
+    UseInitArray = 0;
     StackAlignment = 0;
 
     Inlining = NoInlining;

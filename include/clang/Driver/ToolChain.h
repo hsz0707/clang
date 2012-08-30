@@ -227,6 +227,10 @@ public:
   virtual void AddClangSystemIncludeArgs(const ArgList &DriverArgs,
                                          ArgStringList &CC1Args) const;
 
+  // AddClangTargetOptions - Add options that need to be passed to cc1 for
+  // this target.
+  virtual void AddClangTargetOptions(ArgStringList &CC1Args) const;
+
   // GetRuntimeLibType - Determine the runtime library type to use with the
   // given compilation arguments.
   virtual RuntimeLibType GetRuntimeLibType(const ArgList &Args) const;
