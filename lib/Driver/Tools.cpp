@@ -820,6 +820,14 @@ void Clang::AddARMTargetArgs(const ArgList &Args,
       CmdArgs.push_back("-mno-global-merge");
   }
 
+  if (Args.hasArg(options::OPT_mehabi)) {
+    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-arm-enable-ehabi");
+
+    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-arm-enable-ehabi-descriptors");
+  }
+
   if (Args.hasArg(options::OPT_mignore_has_ras)) {
     CmdArgs.push_back("-backend-option");
     CmdArgs.push_back("-arm-ignore-has-ras");
