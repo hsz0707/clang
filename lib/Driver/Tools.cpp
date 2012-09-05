@@ -820,6 +820,11 @@ void Clang::AddARMTargetArgs(const ArgList &Args,
       CmdArgs.push_back("-mno-global-merge");
   }
 
+  if (Args.hasArg(options::OPT_mignore_has_ras)) {
+    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-arm-ignore-has-ras");
+  }
+
   if (Args.hasArg(options::OPT_mno_implicit_float))
     CmdArgs.push_back("-no-implicit-float");
 }
