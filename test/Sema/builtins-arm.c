@@ -9,8 +9,9 @@ void __clear_cache(char*, char*);
 void __clear_cache(void*, void*);
 #endif
 
-// va_list on ARM is void*.
+// va_list on ARM is struct { void* __ap }.
 void test2() {
-  __builtin_va_list ptr = "x";
-  *ptr = '0'; // expected-error {{incomplete type 'void' is not assignable}}
+  __builtin_va_list ptr;
+  ptr.__ap = "x";
+  *(ptr.__ap) = '0'; // expected-error {{incomplete type 'void' is not assignable}}
 }

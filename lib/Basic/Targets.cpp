@@ -880,7 +880,7 @@ public:
     }
   }
 
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     // This is the ELF definition, and is overridden by the Darwin sub-target
     return "typedef struct __va_list_tag {"
            "  unsigned char gpr;"
@@ -909,7 +909,7 @@ public:
       LongDoubleFormat = &llvm::APFloat::IEEEdouble;
     }
   }
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef char* __builtin_va_list;";
   }
 };
@@ -929,7 +929,7 @@ public:
     DescriptionString = "E-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
                         "i64:32:64-f32:32:32-f64:64:64-v128:128:128-n32";
   }
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef char* __builtin_va_list;";
   }
 };
@@ -1013,7 +1013,7 @@ namespace {
       // FIXME: Is this really right?
       return "";
     }
-    virtual const char *getVAListDeclaration() const {
+    virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
       // FIXME: implement
       return "typedef char* __builtin_va_list;";
     }
@@ -1098,7 +1098,7 @@ public:
     return Feature == "mblaze";
   }
   
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef char* __builtin_va_list;";
   }
   virtual const char *getTargetPrefix() const {
@@ -2240,7 +2240,7 @@ public:
     // MaxAtomicInlineWidth. (cmpxchg8b is an i586 instruction.)
     MaxAtomicPromoteWidth = MaxAtomicInlineWidth = 64;
   }
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef char* __builtin_va_list;";
   }
 
@@ -2500,7 +2500,7 @@ public:
     MaxAtomicPromoteWidth = 128;
     MaxAtomicInlineWidth = 64;
   }
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef struct __va_list_tag {"
            "  unsigned gp_offset;"
            "  unsigned fp_offset;"
@@ -2541,7 +2541,7 @@ public:
     WindowsTargetInfo<X86_64TargetInfo>::getTargetDefines(Opts, Builder);
     Builder.defineMacro("_WIN64");
   }
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef char* __builtin_va_list;";
   }
 };
@@ -2873,8 +2873,12 @@ public:
     NumRecords = clang::ARM::LastTSBuiltin-Builtin::FirstTSBuiltin;
   }
   virtual bool isCLZForZeroUndef() const { return false; }
-  virtual const char *getVAListDeclaration() const {
-    return "typedef void* __builtin_va_list;";
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
+    return IsCPlusPlus ?
+      ("namespace std { struct __va_list { void *__ap; }; }\n"
+       "typedef std::__va_list __builtin_va_list;\n") :
+      ("struct __va_list { void *__ap; };\n"
+       "typedef struct __va_list __builtin_va_list;\n");
   }
   virtual void getGCCRegNames(const char * const *&Names,
                               unsigned &NumNames) const;
@@ -3054,7 +3058,7 @@ public:
     return Feature == "hexagon";
   }
   
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef char* __builtin_va_list;";
   }
   virtual void getGCCRegNames(const char * const *&Names,
@@ -3213,7 +3217,7 @@ public:
                                  unsigned &NumRecords) const {
     // FIXME: Implement!
   }
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef void* __builtin_va_list;";
   }
   virtual void getGCCRegNames(const char * const *&Names,
@@ -3357,7 +3361,7 @@ namespace {
       // FIXME: Is this really right?
       return "";
     }
-    virtual const char *getVAListDeclaration() const {
+    virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
       // FIXME: implement
       return "typedef char* __builtin_va_list;";
    }
@@ -3438,7 +3442,7 @@ namespace {
     virtual const char *getClobbers() const {
       return "";
     }
-    virtual const char *getVAListDeclaration() const {
+    virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
       return "typedef void* __builtin_va_list;";
     }
     virtual void getGCCRegNames(const char * const *&Names,
@@ -3510,7 +3514,7 @@ public:
   virtual bool hasFeature(StringRef Feature) const {
     return Feature == "mips";
   }
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef void* __builtin_va_list;";
   }
   virtual void getGCCRegNames(const char * const *&Names,
@@ -3884,7 +3888,7 @@ public:
   virtual void getTargetBuiltins(const Builtin::Info *&Records,
                                  unsigned &NumRecords) const {
   }
-  virtual const char *getVAListDeclaration() const {
+  virtual const char *getVAListDeclaration(bool IsCPlusPlus) const {
     return "typedef int __builtin_va_list[4];";
   }
   virtual void getGCCRegNames(const char * const *&Names,
