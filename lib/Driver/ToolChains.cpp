@@ -986,7 +986,6 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
   llvm::Triple MultiarchTriple
     = TargetTriple.isArch32Bit() ? TargetTriple.get64BitArchVariant()
                                  : TargetTriple.get32BitArchVariant();
-  llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
   // The library directories which may contain GCC installations.
   SmallVector<StringRef, 4> CandidateLibDirs, CandidateMultiarchLibDirs;
   // The compatible GCC triples for this particular architecture.
@@ -1024,7 +1023,7 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
       if (!llvm::sys::fs::exists(LibDir))
         continue;
       for (unsigned k = 0, ke = CandidateTripleAliases.size(); k < ke; ++k)
-        ScanLibDirForGCCTriple(TargetArch, Args, LibDir,
+        ScanLibDirForGCCTriple(TargetTriple, Args, LibDir,
                                CandidateTripleAliases[k]);
     }
     for (unsigned j = 0, je = CandidateMultiarchLibDirs.size(); j < je; ++j) {
@@ -1034,7 +1033,7 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
         continue;
       for (unsigned k = 0, ke = CandidateMultiarchTripleAliases.size(); k < ke;
            ++k)
-        ScanLibDirForGCCTriple(TargetArch, Args, LibDir,
+        ScanLibDirForGCCTriple(TargetTriple, Args, LibDir,
                                CandidateMultiarchTripleAliases[k],
                                /*NeedsMultiarchSuffix=*/true);
     }
@@ -1227,27 +1226,38 @@ static bool hasMipsN32ABIArg(const ArgList &Args) {
   return A && (A->getValue() == StringRef("n32"));
 }
 
-static StringRef getTargetMultiarchSuffix(llvm::Triple::ArchType TargetArch,
+static StringRef getTargetMultiarchSuffix(const llvm::Triple &TargetTriple,
                                           const ArgList &Args) {
-  if (TargetArch == llvm::Triple::x86_64 ||
-      TargetArch == llvm::Triple::ppc64)
-    return "/64";
+  const llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
+  const bool isAndroid = TargetTriple.getEnvironment() == llvm::Triple::Android;
 
-  if (TargetArch == llvm::Triple::mips64 ||
-      TargetArch == llvm::Triple::mips64el) {
-    if (hasMipsN32ABIArg(Args))
-      return "/n32";
-    else
+  if (!isAndroid) {
+    if (TargetArch == llvm::Triple::x86_64 ||
+        TargetArch == llvm::Triple::ppc64)
       return "/64";
-  }
 
-  return "/32";
+    if (TargetArch == llvm::Triple::mips64 ||
+        TargetArch == llvm::Triple::mips64el) {
+      if (hasMipsN32ABIArg(Args))
+        return "/n32";
+      else
+        return "/64";
+    }
+    return "/32"
+  } else {
+    StringRef TargetTripleStr = TargetTriple.str();
+    if (TargetTripleStr.startswith("armv7") || TargetTripleStr.startswith("thumbv7"))
+      return (TargetArch == llvm::Triple::thumb)? "/armv7-a/thumb" : "/armv7-a";
+    else
+      return (TargetArch == llvm::Triple::thumb)? "/thumb" : "/32";
+  }
 }
 
 void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
-    llvm::Triple::ArchType TargetArch, const ArgList &Args,
+    const llvm::Triple &TargetTriple, const ArgList &Args,
     const std::string &LibDir,
     StringRef CandidateTriple, bool NeedsMultiarchSuffix) {
+  const llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
   // There are various different suffixes involving the triple we
   // check for. We also record what is necessary to walk from each back
   // up to the lib directory.
@@ -1293,7 +1303,7 @@ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
       // *if* there is a subdirectory of the right name with crtbegin.o in it,
       // we use that. If not, and if not a multiarch triple, we look for
       // crtbegin.o without the subdirectory.
-      StringRef MultiarchSuffix = getTargetMultiarchSuffix(TargetArch, Args);
+      StringRef MultiarchSuffix = getTargetMultiarchSuffix(TargetTriple, Args);
       if (llvm::sys::fs::exists(LI->path() + MultiarchSuffix + "/crtbegin.o")) {
         GCCMultiarchSuffix = MultiarchSuffix.str();
       } else {
@@ -2081,14 +2091,14 @@ Linux::Linux(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
   if (Arch == llvm::Triple::arm || Arch == llvm::Triple::thumb)
     ExtraOpts.push_back("-X");
 
-  const bool IsAndroid = Triple.getEnvironment() == llvm::Triple::Android;
+  const bool isAndroid = Triple.getEnvironment() == llvm::Triple::Android;
 
   // Do not use 'gnu' hash style for Mips targets because .gnu.hash
   // and the MIPS ABI require .dynsym to be sorted in different ways.
   // .gnu.hash needs symbols to be grouped by hash code whereas the MIPS
   // ABI requires a mapping between the GOT and the symbol table.
   // Android loader does not support .gnu.hash.
-  if (!isMipsArch(Arch) && !IsAndroid) {
+  if (!isMipsArch(Arch) && !isAndroid) {
     if (IsRedhat(Distro) || IsOpenSuse(Distro) ||
         (IsUbuntu(Distro) && Distro >= UbuntuMaverick))
       ExtraOpts.push_back("--hash-style=gnu");
@@ -2125,7 +2135,7 @@ Linux::Linux(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
     const llvm::Triple &GCCTriple = GCCInstallation.getTriple();
     const std::string &LibPath = GCCInstallation.getParentLibPath();
 
-    if (IsAndroid && isMipsR2Arch(Triple.getArch(), Args))
+    if (isAndroid && isMipsR2Arch(Triple.getArch(), Args))
       addPathIfExists(GCCInstallation.getInstallPath() +
                       GCCInstallation.getMultiarchSuffix() +
                       "/mips-r2",
@@ -2134,7 +2144,7 @@ Linux::Linux(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
       addPathIfExists((GCCInstallation.getInstallPath() +
                        GCCInstallation.getMultiarchSuffix()),
                       Paths);
-    if (IsAndroid) {
+    if (isAndroid) {
       // Add libstdc++ path
       const std::string LibstdcppPath = getDriver().Dir + "/../" + GCCTriple.str() +
                 "/lib" + GCCInstallation.getMultiarchSuffix().str();
@@ -2156,7 +2166,7 @@ Linux::Linux(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
     }
     // On Android, libraries in the parent prefix of the GCC installation are
     // preferred to the ones under sysroot.
-    if (IsAndroid) {
+    if (isAndroid) {
       addPathIfExists(LibPath + "/../" + GCCTriple.str() + "/lib", Paths);
     }
   }
