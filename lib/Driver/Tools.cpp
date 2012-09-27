@@ -722,6 +722,7 @@ void Clang::AddARMTargetArgs(const ArgList &Args,
   std::string TripleStr = getToolChain().ComputeEffectiveClangTriple(Args);
   llvm::Triple Triple(TripleStr);
   std::string CPUName = getARMTargetCPU(Args, Triple);
+  const bool isAndroid = Triple.getEnvironment() == llvm::Triple::Android;
 
   // Select the ABI to use.
   //
@@ -835,7 +836,7 @@ void Clang::AddARMTargetArgs(const ArgList &Args,
       CmdArgs.push_back("-mno-global-merge");
   }
 
-  if (Args.hasArg(options::OPT_mehabi)) {
+  if (isAndroid || Args.hasArg(options::OPT_mehabi)) {
     CmdArgs.push_back("-backend-option");
     CmdArgs.push_back("-arm-enable-ehabi");
 
@@ -843,7 +844,7 @@ void Clang::AddARMTargetArgs(const ArgList &Args,
     CmdArgs.push_back("-arm-enable-ehabi-descriptors");
   }
 
-  if (Args.hasArg(options::OPT_mignore_has_ras)) {
+  if (isAndroid || Args.hasArg(options::OPT_mignore_has_ras)) {
     CmdArgs.push_back("-backend-option");
     CmdArgs.push_back("-arm-ignore-has-ras");
   }
@@ -1243,6 +1244,11 @@ void Clang::AddX86TargetArgs(const ArgList &Args,
   // attributes here.
   llvm::StringMap<unsigned> PrevFeature;
   std::vector<const char*> Features;
+  if (isAndroid) {
+    // Add -msse3
+    PrevFeature["sse3"] = Features.size() + 1;
+    Features.push_back("+sse3");
+  }
   for (arg_iterator it = Args.filtered_begin(options::OPT_m_x86_Features_Group),
          ie = Args.filtered_end(); it != ie; ++it) {
     StringRef Name = (*it)->getOption().getName();
@@ -1651,6 +1657,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   bool KernelOrKext = Args.hasArg(options::OPT_mkernel,
                                   options::OPT_fapple_kext);
   const Driver &D = getToolChain().getDriver();
+  std::string TripleStr = getToolChain().ComputeEffectiveClangTriple(Args);
+  llvm::Triple Triple(TripleStr);
+  const bool isAndroid = Triple.getEnvironment() == llvm::Triple::Android;
   ArgStringList CmdArgs;
 
   assert(Inputs.size() == 1 && "Unable to handle multiple inputs.");
@@ -1662,7 +1671,6 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // Add the "effective" target triple.
   CmdArgs.push_back("-triple");
-  std::string TripleStr = getToolChain().ComputeEffectiveClangTriple(Args);
   CmdArgs.push_back(Args.MakeArgString(TripleStr));
 
   // Select the appropriate action.
@@ -1839,7 +1847,30 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       IsPICLevelTwo = O.matches(options::OPT_fPIE) ||
                       O.matches(options::OPT_fPIC);
     } else {
-      PIE = PIC = false;
+      if (!isAndroid) {
+        PIE = PIC = false;
+      } else {
+       // add Android-specific default
+        switch(getToolChain().getTriple().getArch()) {
+        default:
+          break;
+
+        case llvm::Triple::arm:
+        case llvm::Triple::thumb:
+        case llvm::Triple::mips:
+        case llvm::Triple::mipsel:
+        case llvm::Triple::mips64:
+        case llvm::Triple::mips64el:
+          PIC = true; // "-fpic"
+          break;
+
+        case llvm::Triple::x86:
+        case llvm::Triple::x86_64:
+          PIC = true; // "-fPIC"
+          IsPICLevelTwo = true;
+          break;
+        }
+      }
     }
   }
   // Check whether the tool chain trumps the PIC-ness decision. If the PIC-ness
@@ -1859,7 +1890,6 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // Note that these flags are trump-cards. Regardless of the order w.r.t. the
   // PIC or PIE options above, if these show up, PIC is disabled.
-  llvm::Triple Triple(TripleStr);
   if ((Args.hasArg(options::OPT_mkernel) ||
        Args.hasArg(options::OPT_fapple_kext)) &&
       (Triple.getOS() != llvm::Triple::IOS ||
@@ -2586,8 +2616,21 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   // Translate -mstackrealign
+  bool DefaultStackRealign = false;
+  if (isAndroid) {
+    switch(getToolChain().getTriple().getArch()) {
+    default:
+      break;
+
+    case llvm::Triple::x86:
+    case llvm::Triple::x86_64:
+      DefaultStackRealign = true;
+      break;
+    }
+  }
+
   if (Args.hasFlag(options::OPT_mstackrealign, options::OPT_mno_stackrealign,
-                   false)) {
+                   DefaultStackRealign)) {
     CmdArgs.push_back("-backend-option");
     CmdArgs.push_back("-force-align-stack");
   }
@@ -5819,6 +5862,8 @@ void linuxtools::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
                                         const InputInfoList &Inputs,
                                         const ArgList &Args,
                                         const char *LinkingOutput) const {
+  const bool isAndroid = getToolChain().getTriple().getEnvironment() ==
+    llvm::Triple::Android;
   ArgStringList CmdArgs;
 
   // Add --32/--64 to make sure we get the format we want.
@@ -5877,11 +5922,12 @@ void linuxtools::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
                                       options::OPT_fpic, options::OPT_fno_pic,
                                       options::OPT_fPIE, options::OPT_fno_PIE,
                                       options::OPT_fpie, options::OPT_fno_pie);
-    if (LastPICArg &&
-        (LastPICArg->getOption().matches(options::OPT_fPIC) ||
-         LastPICArg->getOption().matches(options::OPT_fpic) ||
-         LastPICArg->getOption().matches(options::OPT_fPIE) ||
-         LastPICArg->getOption().matches(options::OPT_fpie))) {
+    if (isAndroid ||
+        (LastPICArg &&
+         (LastPICArg->getOption().matches(options::OPT_fPIC) ||
+          LastPICArg->getOption().matches(options::OPT_fpic) ||
+          LastPICArg->getOption().matches(options::OPT_fPIE) ||
+          LastPICArg->getOption().matches(options::OPT_fpie)))) {
       CmdArgs.push_back("-KPIC");
     }
   }
@@ -5905,8 +5951,8 @@ void linuxtools::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
 
 static void AddLibgcc(llvm::Triple Triple, const Driver &D,
                       ArgStringList &CmdArgs, const ArgList &Args) {
-  bool isAndroid = Triple.getEnvironment() == llvm::Triple::Android;
-  bool StaticLibgcc = Args.hasArg(options::OPT_static) ||
+  const bool isAndroid = Triple.getEnvironment() == llvm::Triple::Android;
+  const bool StaticLibgcc = Args.hasArg(options::OPT_static) ||
                       Args.hasArg(options::OPT_static_libgcc);
   if (!D.CCCIsCXX)
     CmdArgs.push_back("-lgcc");
