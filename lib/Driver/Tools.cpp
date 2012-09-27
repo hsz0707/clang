@@ -1012,7 +1012,7 @@ void Clang::AddX86TargetArgs(const ArgList &Args,
       if (getToolChain().getArch() == llvm::Triple::x86_64)
         CPUName = "x86-64";
       else if (getToolChain().getArch() == llvm::Triple::x86)
-        CPUName = "pentium4";
+        CPUName = isAndroid? "i686" : "pentium4";
     }
   }
 
