@@ -2063,6 +2063,12 @@ Linux::Linux(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
   if (GCCInstallation.isValid()) {
     const llvm::Triple &GCCTriple = GCCInstallation.getTriple();
     const std::string &LibPath = GCCInstallation.getParentLibPath();
+    if (IsAndroid) {
+      // Add libstdc++ path
+      const std::string LibstdcppPath = getDriver().Dir + "/../" + GCCTriple.str() +
+                "/lib" + GCCInstallation.getMultiarchSuffix().str();
+      addPathIfExists(LibstdcppPath, Paths);
+    }
     addPathIfExists((GCCInstallation.getInstallPath() +
                      GCCInstallation.getMultiarchSuffix()),
                     Paths);
