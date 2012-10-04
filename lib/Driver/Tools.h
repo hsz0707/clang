@@ -639,7 +639,9 @@ namespace visualstudio {
   };
 } // end namespace visualstudio
 
-} // end namespace toolchains
+extern const char *GetLinkerName(const ArgList &Args);
+
+} // end namespace tools
 } // end namespace driver
 } // end namespace clang
 
