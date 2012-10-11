@@ -1585,7 +1585,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // PIC or PIE options above, if these show up, PIC is disabled.
   if (Args.hasArg(options::OPT_mkernel))
     PICDisabled = true;
-  if (Args.hasArg(options::OPT_static))
+  if (Args.hasArg(options::OPT_static) && !isAndroid)
     PICDisabled = true;
   bool DynamicNoPIC = Args.hasArg(options::OPT_mdynamic_no_pic);
 
