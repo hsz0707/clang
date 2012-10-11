@@ -113,6 +113,7 @@ protected:
     void ScanLibDirForGCCTriple(const llvm::Triple &TargetTriple,
                                 const std::string &LibDir,
                                 StringRef CandidateTriple,
+                                const ArgList &Args,
                                 bool NeedsMultiarchSuffix = false);
   };
 
