@@ -1243,13 +1243,32 @@ static StringRef getTargetMultiarchSuffix(const llvm::Triple &TargetTriple,
       else
         return "/64";
     }
-    return "/32"
+    return "/32";
   } else {
-    StringRef TargetTripleStr = TargetTriple.str();
-    if (TargetTripleStr.startswith("armv7") || TargetTripleStr.startswith("thumbv7"))
-      return (TargetArch == llvm::Triple::thumb)? "/armv7-a/thumb" : "/armv7-a";
-    else
-      return (TargetArch == llvm::Triple::thumb)? "/thumb" : "/32";
+    bool IsV7a = false;
+    bool IsThumb = TargetArch == llvm::Triple::thumb;
+
+    // Get IsV7a from target triple
+    StringRef ArchName(TargetTriple.getArchName());
+    if (ArchName.startswith("armv7") || ArchName.startswith("thumbv7")) {
+      IsV7a = true;
+    }
+
+    // Override target triple with -march
+    if (const Arg *A = Args.getLastArg(options::OPT_march_EQ)) {
+      IsV7a = (strcmp(A->getValue(), "armv7-a") == 0);
+    }
+
+    // Override target triple with -mthumb or -mno-thumb
+    if (const Arg *A = Args.getLastArg(options::OPT_mthumb,
+                                       options::OPT_mno_thumb)) {
+      IsThumb = A->getOption().matches(options::OPT_mthumb);
+    }
+
+    if (IsV7a) {
+      return IsThumb ? "/armv7-a/thumb" : "/armv7-a";
+    } else
+      return IsThumb ? "/thumb" : "";
   }
 }
 
