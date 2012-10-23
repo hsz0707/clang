@@ -2145,8 +2145,6 @@ Linux::Linux(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
       addPathIfExists(LibPath + "/../" + GCCTriple.str() + "/lib", Paths);
       addPathIfExists(LibPath, Paths);
     }
-
-    addPathIfExists(LibPath + "/../" + GCCTriple.str() + "/lib", Paths);
   }
   addPathIfExists(SysRoot + "/lib", Paths);
   addPathIfExists(SysRoot + "/usr/lib", Paths);

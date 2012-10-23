@@ -1614,7 +1614,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back(LastPICArg->getOption().matches(options::OPT_fPIE) ? "2":"1");
   } else if (ModelStr == "pic" || ModelStr == "dynamic-no-pic") {
     bool isPIC = DefaultPICLevel == 2 ||
-                  (LastPICArg && 
+                  (LastPICArg &&
                    LastPICArg->getOption().matches(options::OPT_fPIC));
     CmdArgs.push_back("-pic-level");
     CmdArgs.push_back(((ModelStr != "dynamic-no-pic" && isPIC) ||
@@ -5166,7 +5166,7 @@ void linuxtools::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
                                       options::OPT_fpic, options::OPT_fno_pic,
                                       options::OPT_fPIE, options::OPT_fno_PIE,
                                       options::OPT_fpie, options::OPT_fno_pie);
-    if (isAndroid || 
+    if (isAndroid ||
         (LastPICArg &&
          (LastPICArg->getOption().matches(options::OPT_fPIC) ||
           LastPICArg->getOption().matches(options::OPT_fpic) ||
