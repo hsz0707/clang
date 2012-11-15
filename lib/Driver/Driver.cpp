@@ -942,7 +942,7 @@ void Driver::BuildInputs(const ToolChain &TC, const DerivedArgList &Args,
           // should autodetect some input files as C++ for g++ compatibility.
           if (CCCIsCXX) {
             const bool isAndroid = TC.getTriple().getEnvironment()
-              == llvm::Triple::Andriod;
+              == llvm::Triple::Android;
             types::ID OldTy = Ty;
             Ty = types::lookupCXXTypeForCType(Ty);
 
