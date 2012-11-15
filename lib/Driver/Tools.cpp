@@ -980,6 +980,25 @@ void Clang::AddX86TargetArgs(const ArgList &Args,
                    false))
     CmdArgs.push_back("-no-implicit-float");
 
+  // Setting -mstack-protector-guard=[global|tls] for different stack protector
+  // cookie implementation.
+  bool ForceGVStackCookie = false;
+  if (isAndroid) {
+    // For Android, we have to default to global variable implementation;
+    // otherwise, the Android x86 devices with old bionic will be unable
+    // to run the applications with stack protectors.
+    ForceGVStackCookie = true;
+  }
+  if (Arg *A = Args.getLastArg(options::OPT_mstack_protector_guard_EQ)) {
+    if (StringRef(A->getValue(Args)) == "tls") {
+      ForceGVStackCookie = false;
+    }
+  }
+  if (ForceGVStackCookie) {
+    CmdArgs.push_back("-backend-option");
+    CmdArgs.push_back("-x86-force-gv-stack-cookie");
+  }
+
   const char *CPUName = 0;
   if (const Arg *A = Args.getLastArg(options::OPT_march_EQ)) {
     if (StringRef(A->getValue(Args)) == "native") {
