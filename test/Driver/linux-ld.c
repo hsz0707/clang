@@ -271,7 +271,7 @@
 // Test linker invocation on Android.
 // RUN: %clang -no-canonical-prefixes %s -### -o %t.o 2>&1 \
 // RUN:     -target arm-linux-androideabi \
-// RUN:     --sysroot=%S/Inputs/basic_android_tree \
+// RUN:     --sysroot=%S/Inputs/basic_android_tree/sysroot \
 // RUN:   | FileCheck --check-prefix=CHECK-ANDROID %s
 // CHECK-ANDROID: "{{.*}}ld{{(.exe)?}}" "--sysroot=[[SYSROOT:[^"]+]]"
 // CHECK-ANDROID: "{{.*}}/crtbegin_dynamic.o"
@@ -282,7 +282,7 @@
 // CHECK-ANDROID: "{{.*}}/crtend_android.o"
 // RUN: %clang -no-canonical-prefixes %s -### -o %t.o 2>&1 \
 // RUN:     -target arm-linux-androideabi \
-// RUN:     --sysroot=%S/Inputs/basic_android_tree \
+// RUN:     --sysroot=%S/Inputs/basic_android_tree/sysroot \
 // RUN:     -shared \
 // RUN:   | FileCheck --check-prefix=CHECK-ANDROID-SO %s
 // CHECK-ANDROID-SO: "{{.*}}ld{{(.exe)?}}" "--sysroot=[[SYSROOT:[^"]+]]"
@@ -294,7 +294,7 @@
 // CHECK-ANDROID-SO: "{{.*}}/crtend_so.o"
 // RUN: %clang -no-canonical-prefixes %s -### -o %t.o 2>&1 \
 // RUN:     -target arm-linux-androideabi \
-// RUN:     --sysroot=%S/Inputs/basic_android_tree \
+// RUN:     --sysroot=%S/Inputs/basic_android_tree/sysroot \
 // RUN:     -static \
 // RUN:   | FileCheck --check-prefix=CHECK-ANDROID-STATIC %s
 // CHECK-ANDROID-STATIC: "{{.*}}ld{{(.exe)?}}" "--sysroot=[[SYSROOT:[^"]+]]"
