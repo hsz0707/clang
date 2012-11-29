@@ -3795,6 +3795,8 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
   case llvm::Triple::le32: {
     if (Triple.getOS() == llvm::Triple::NDK) {
       return *(TheTargetCodeGenInfo = new AndroidTargetCodeGenInfo(Types));
+    } else {
+      return *(TheTargetCodeGenInfo = new DefaultTargetCodeGenInfo(Types));
     }
   }
   }
