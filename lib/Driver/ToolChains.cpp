@@ -1060,6 +1060,71 @@ Darwin_Generic_GCC::ComputeEffectiveClangTriple(const ArgList &Args,
   return ComputeLLVMTriple(Args, InputType);
 }
 
+/// NDKClang - Toolchain to generate bitcode
+
+NDKClang::NDKClang(const Driver &D, const llvm::Triple& Triple)
+  : ToolChain(D, Triple) {
+  getProgramPaths().push_back(getDriver().getInstalledDir());
+  if (getDriver().getInstalledDir() != getDriver().Dir)
+    getProgramPaths().push_back(getDriver().Dir);
+}
+
+NDKClang::~NDKClang() {
+}
+
+bool NDKClang::IsUnwindTablesDefault() const {
+  return true;
+}
+
+const char * NDKClang::GetDefaultRelocationModel() const {
+  return "pic";
+}
+
+const char * NDKClang::GetForcedPicModel() const {
+  return 0;
+}
+
+bool NDKClang::UseSjLjExceptions() const {
+  return false;
+}
+
+bool NDKClang::HasNativeLLVMSupport() const {
+  return true;
+}
+
+Tool &NDKClang::SelectTool(const Compilation &C,
+                              const JobAction &JA,
+                              const ActionList &Inputs) const {
+  Action::ActionClass Key;
+  if (getDriver().ShouldUseClangCompiler(C, JA, getTriple()))
+    Key = Action::AnalyzeJobClass;
+  else
+    Key = JA.getKind();
+
+  Tool *&T = Tools[Key];
+
+  if (!T) {
+    switch (Key) {
+    default:
+      llvm_unreachable("Invalid tool kind.");
+    case Action::PreprocessJobClass:
+      T = new tools::gcc::Preprocess(*this); break;
+    case Action::AnalyzeJobClass:
+    case Action::MigrateJobClass:
+      T = new tools::Clang(*this); break;
+    case Action::PrecompileJobClass:
+    case Action::CompileJobClass:
+      T = new tools::gcc::Compile(*this); break;
+    case Action::AssembleJobClass:
+      T = new tools::ClangAs(*this); break;
+    case Action::LinkJobClass:
+      T = new tools::ndktools::Link(*this); break;
+    }
+  }
+
+  return *T;
+}
+
 /// Generic_GCC - A tool chain using the 'gcc' command to perform
 /// all subcommands; this relies on gcc translating the majority of
 /// command line options.
