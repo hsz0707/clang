@@ -231,7 +231,7 @@ static bool forwardToGCC(const Option &O) {
 
 const char *clang::driver::tools::GetLinkerName(const ArgList &Args) {
   if (Arg *A = Args.getLastArg(options::OPT_fuse_ld_EQ)) {
-    StringRef LDSuffix(A->getValue(Args, 0));
+    StringRef LDSuffix(A->getValue(0));
     if (LDSuffix == "bfd") {
       return "ld.bfd";
     }
