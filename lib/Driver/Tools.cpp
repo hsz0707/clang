@@ -1220,7 +1220,7 @@ static void addExceptionArgs(const ArgList &Args, types::ID InputType,
 
   // Exception tables and cleanups can be enabled with -fexceptions even if the
   // language itself doesn't support exceptions.
-  if (ExceptionsEnabled && (DidHaveExplicitExceptionFlag || isAndroid))
+  if (ExceptionsEnabled && DidHaveExplicitExceptionFlag)
     ShouldUseExceptionTables = true;
 
   // Obj-C exceptions are enabled by default, regardless of -fexceptions. This
@@ -1236,7 +1236,7 @@ static void addExceptionArgs(const ArgList &Args, types::ID InputType,
   }
 
   if (types::isCXX(InputType)) {
-    bool CXXExceptionsEnabled = ExceptionsEnabled;
+    bool CXXExceptionsEnabled = ExceptionsEnabled || isAndroid;
 
     if (Arg *A = Args.getLastArg(options::OPT_fcxx_exceptions,
                                  options::OPT_fno_cxx_exceptions,
