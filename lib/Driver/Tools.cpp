@@ -1198,7 +1198,6 @@ static void addExceptionArgs(const ArgList &Args, types::ID InputType,
     Args.ClaimAllArgs(options::OPT_fno_cxx_exceptions);
     return;
   }
-  const bool isAndroid = Triple.getEnvironment() == llvm::Triple::ANDROID;
 
   // Exceptions are enabled by default.
   bool ExceptionsEnabled = true;
@@ -1236,7 +1235,7 @@ static void addExceptionArgs(const ArgList &Args, types::ID InputType,
   }
 
   if (types::isCXX(InputType)) {
-    bool CXXExceptionsEnabled = ExceptionsEnabled || isAndroid;
+    bool CXXExceptionsEnabled = ExceptionsEnabled;
 
     if (Arg *A = Args.getLastArg(options::OPT_fcxx_exceptions,
                                  options::OPT_fno_cxx_exceptions,
