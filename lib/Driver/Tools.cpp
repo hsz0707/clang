@@ -1227,7 +1227,7 @@ void Clang::AddX86TargetArgs(const ArgList &Args,
       else if (getToolChain().getArch() == llvm::Triple::x86)
         // All x86 devices running Android have core2 as their common
         // denominator. This makes a better choice than pentium4.
-        CPUName = isAndroid ? "core2" : "pentium4";
+        CPUName = isAndroid ? "i686" : "pentium4";
     }
   }
 
@@ -1384,7 +1384,6 @@ static void addExceptionArgs(const ArgList &Args, types::ID InputType,
     Args.ClaimAllArgs(options::OPT_fno_cxx_exceptions);
     return;
   }
-  const bool isAndroid = Triple.getEnvironment() == llvm::Triple::Android;
 
   // Exceptions are enabled by default.
   bool ExceptionsEnabled = true;
@@ -1422,7 +1421,7 @@ static void addExceptionArgs(const ArgList &Args, types::ID InputType,
   }
 
   if (types::isCXX(InputType)) {
-    bool CXXExceptionsEnabled = ExceptionsEnabled || isAndroid;
+    bool CXXExceptionsEnabled = ExceptionsEnabled;
 
     if (Arg *A = Args.getLastArg(options::OPT_fcxx_exceptions,
                                  options::OPT_fno_cxx_exceptions,
@@ -1835,6 +1834,28 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   bool PIE = false;
   bool PIC = getToolChain().isPICDefault();
   bool IsPICLevelTwo = PIC;
+  if (isAndroid) {
+   // add Android-specific default
+    switch(getToolChain().getTriple().getArch()) {
+    default:
+      break;
+
+    case llvm::Triple::arm:
+    case llvm::Triple::thumb:
+    case llvm::Triple::mips:
+    case llvm::Triple::mipsel:
+    case llvm::Triple::mips64:
+    case llvm::Triple::mips64el:
+      PIC = true; // "-fpic"
+      break;
+
+    case llvm::Triple::x86:
+    case llvm::Triple::x86_64:
+      PIC = true; // "-fPIC"
+      IsPICLevelTwo = true;
+      break;
+    }
+  }
   if (Arg *A = Args.getLastArg(options::OPT_fPIC, options::OPT_fno_PIC,
                                options::OPT_fpic, options::OPT_fno_pic,
                                options::OPT_fPIE, options::OPT_fno_PIE,
@@ -1846,32 +1867,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       PIC = PIE || O.matches(options::OPT_fPIC) || O.matches(options::OPT_fpic);
       IsPICLevelTwo = O.matches(options::OPT_fPIE) ||
                       O.matches(options::OPT_fPIC);
-    } else {
-      if (!isAndroid) {
-        PIE = PIC = false;
-      } else {
-       // add Android-specific default
-        switch(getToolChain().getTriple().getArch()) {
-        default:
-          break;
-
-        case llvm::Triple::arm:
-        case llvm::Triple::thumb:
-        case llvm::Triple::mips:
-        case llvm::Triple::mipsel:
-        case llvm::Triple::mips64:
-        case llvm::Triple::mips64el:
-          PIC = true; // "-fpic"
-          break;
-
-        case llvm::Triple::x86:
-        case llvm::Triple::x86_64:
-          PIC = true; // "-fPIC"
-          IsPICLevelTwo = true;
-          break;
-        }
-      }
-    }
+    } else
+      PIE = PIC = false;
   }
   // Check whether the tool chain trumps the PIC-ness decision. If the PIC-ness
   // is forced, then neither PIC nor PIE flags will have no effect.
