@@ -28,7 +28,7 @@
 
 #ifdef _WIN32
 #include <malloc.h>
-#else
+#elif !defined(__ANDROID__) || defined(HAVE_POSIX_MEMALIGN)
 #ifndef __cplusplus
 extern int posix_memalign(void **memptr, size_t alignment, size_t size);
 #else
@@ -57,9 +57,11 @@ _mm_malloc(size_t size, size_t align)
   mallocedMemory = __mingw_aligned_malloc(size, align);
 #elif defined(_WIN32)
   mallocedMemory = _aligned_malloc(size, align);
-#else
+#elif !defined(__ANDROID__) || defined(HAVE_POSIX_MEMALIGN)
   if (posix_memalign(&mallocedMemory, align, size))
     return 0;
+#else
+  mallocedMemory = memalign(align, size);
 #endif
 
   return mallocedMemory;
