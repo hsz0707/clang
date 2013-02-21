@@ -207,6 +207,9 @@ const char *clang::driver::tools::GetLinkerName(const ArgList &Args) {
     if (LDSuffix == "gold") {
       return "ld.gold";
     }
+    if (LDSuffix == "mcld") {
+      return "ld.mcld";
+    }
   }
   return "ld";
 }
