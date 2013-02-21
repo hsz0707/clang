@@ -2935,6 +2935,11 @@ public:
     // FIXME: Is this really right?
     return "";
   }
+  virtual int getEHDataRegisterNumber(unsigned RegNo) const {
+    if (RegNo == 0) return 0;
+    if (RegNo == 1) return 1;
+    return -1;
+  }
 };
 
 const char * const ARMTargetInfo::GCCRegNames[] = {
@@ -3595,6 +3600,12 @@ public:
         break;
       }
     }
+  }
+
+  virtual int getEHDataRegisterNumber(unsigned RegNo) const {
+    if (RegNo == 0) return 4;
+    if (RegNo == 1) return 5;
+    return -1;
   }
 };
 
