@@ -3826,9 +3826,9 @@ public:
 class MIPSTargetCodeGenInfo : public TargetCodeGenInfo {
   unsigned SizeOfUnwindException;
 public:
-  MIPSTargetCodeGenInfo(CodeGenTypes &CGT, bool IsO32)
+  MIPSTargetCodeGenInfo(CodeGenTypes &CGT, bool IsAndroid, bool IsO32)
     : TargetCodeGenInfo(new MipsABIInfo(CGT, IsO32)),
-      SizeOfUnwindException(IsO32 ? 24 : 32) {}
+      SizeOfUnwindException((IsO32 && !IsAndroid) ? 24 : 32) {}
 
   int getDwarfEHStackPointer(CodeGen::CodeGenModule &CGM) const {
     return 29;
@@ -4420,6 +4420,7 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
     return *TheTargetCodeGenInfo;
 
   const llvm::Triple &Triple = getContext().getTargetInfo().getTriple();
+  bool IsAndroid = Triple.getEnvironment() == llvm::Triple::Android;
   switch (Triple.getArch()) {
   default:
     return *(TheTargetCodeGenInfo = new DefaultTargetCodeGenInfo(Types));
@@ -4431,11 +4432,13 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
       return *(TheTargetCodeGenInfo = new PNaClTargetCodeGenInfo(Types));
   case llvm::Triple::mips:
   case llvm::Triple::mipsel:
-    return *(TheTargetCodeGenInfo = new MIPSTargetCodeGenInfo(Types, true));
+    return *(TheTargetCodeGenInfo =
+                new MIPSTargetCodeGenInfo(Types, IsAndroid, true));
 
   case llvm::Triple::mips64:
   case llvm::Triple::mips64el:
-    return *(TheTargetCodeGenInfo = new MIPSTargetCodeGenInfo(Types, false));
+    return *(TheTargetCodeGenInfo =
+                new MIPSTargetCodeGenInfo(Types, IsAndroid, false));
 
   case llvm::Triple::arm:
   case llvm::Triple::thumb:
