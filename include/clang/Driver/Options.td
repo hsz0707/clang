@@ -309,6 +309,8 @@ def fno_crash_diagnostics : Flag<"-fno-crash-diagnostics">, Group<f_clang_Group>
 def fcreate_profile : Flag<"-fcreate-profile">, Group<f_Group>;
 def fcxx_exceptions: Flag<"-fcxx-exceptions">, Group<f_Group>;
 def fcxx_modules : Flag <"-fcxx-modules">, Group<f_Group>, Flags<[NoForward]>;
+def fcxx_missing_return_semantics: Flag<"-fcxx-missing-return-semantics">, Group<f_Group>;
+def fno_cxx_missing_return_semantics: Flag<"-fno-cxx-missing-return-semantics">, Group<f_Group>;
 def fdebug_pass_arguments : Flag<"-fdebug-pass-arguments">, Group<f_Group>;
 def fdebug_pass_structure : Flag<"-fdebug-pass-structure">, Group<f_Group>;
 def fdiagnostics_fixit_info : Flag<"-fdiagnostics-fixit-info">, Group<f_clang_Group>;

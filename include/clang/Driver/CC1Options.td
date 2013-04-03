@@ -547,6 +547,8 @@ def fobjc_exceptions : Flag<"-fobjc-exceptions">,
   HelpText<"Enable Objective-C exceptions">;
 def fcxx_exceptions : Flag<"-fcxx-exceptions">,
   HelpText<"Enable C++ exceptions">;
+def fcxx_missing_return_semantics: Flag<"-fcxx-missing-return-semantics">;
+def fno_cxx_missing_return_semantics: Flag<"-fno-cxx-missing-return-semantics">;
 def fsjlj_exceptions : Flag<"-fsjlj-exceptions">,
   HelpText<"Use SjLj style exceptions">;
 def ffast_math : Flag<"-ffast-math">,

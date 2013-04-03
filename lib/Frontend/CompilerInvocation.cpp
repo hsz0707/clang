@@ -686,6 +686,8 @@ static void LangOptsToArgs(const LangOptions &Opts, ToArgsList &Res) {
     Res.push_back("-fsjlj-exceptions");
   if (Opts.TraditionalCPP)
     Res.push_back("-traditional-cpp");
+  if (!Opts.CXXMissingReturnSemantics)
+    Res.push_back("-fno-cxx-missing-return-semantics");
   if (!Opts.RTTI)
     Res.push_back("-fno-rtti");
   if (Opts.MSBitfields)
@@ -1862,6 +1864,9 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   Opts.CXXExceptions = Args.hasArg(OPT_fcxx_exceptions);
   Opts.SjLjExceptions = Args.hasArg(OPT_fsjlj_exceptions);
   Opts.TraditionalCPP = Args.hasArg(OPT_traditional_cpp);
+  Opts.CXXMissingReturnSemantics =
+    Args.hasFlag(OPT_fcxx_missing_return_semantics,
+                 OPT_fno_cxx_missing_return_semantics);
 
   Opts.RTTI = !Args.hasArg(OPT_fno_rtti);
   Opts.Blocks = Args.hasArg(OPT_fblocks);
