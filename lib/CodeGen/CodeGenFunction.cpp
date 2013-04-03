@@ -543,8 +543,9 @@ void CodeGenFunction::GenerateCode(GlobalDecl GD, llvm::Function *Fn,
   // C11 6.9.1p12:
   //   If the '}' that terminates a function is reached, and the value of the
   //   function call is used by the caller, the behavior is undefined.
-  if (getLangOpts().CPlusPlus && !FD->hasImplicitReturnZero() &&
-      !FD->getResultType()->isVoidType() && Builder.GetInsertBlock()) {
+  if (getLangOpts().CXXMissingReturnSemantics && getLangOpts().CPlusPlus &&
+      !FD->hasImplicitReturnZero() && !FD->getResultType()->isVoidType() &&
+      Builder.GetInsertBlock()) {
     if (getLangOpts().SanitizeReturn)
       EmitCheck(Builder.getFalse(), "missing_return",
                 EmitCheckSourceLocation(FD->getLocation()),
