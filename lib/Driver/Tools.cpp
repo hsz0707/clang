@@ -5962,12 +5962,17 @@ static void AddLibgcc(llvm::Triple Triple, const Driver &D,
   const bool isAndroid = Triple.getEnvironment() == llvm::Triple::Android;
   const bool StaticLibgcc = Args.hasArg(options::OPT_static) ||
                       Args.hasArg(options::OPT_static_libgcc);
-  if (!D.CCCIsCXX)
+  bool lgcc_added = false;
+  if (!D.CCCIsCXX) {
     CmdArgs.push_back("-lgcc");
+    lgcc_added = true;
+  }
 
   if (StaticLibgcc || isAndroid) {
-    if (D.CCCIsCXX)
+    if (D.CCCIsCXX) {
       CmdArgs.push_back("-lgcc");
+      lgcc_added = true;
+    }
   } else {
     if (!D.CCCIsCXX)
       CmdArgs.push_back("--as-needed");
@@ -5978,7 +5983,7 @@ static void AddLibgcc(llvm::Triple Triple, const Driver &D,
 
   if (StaticLibgcc && !isAndroid)
     CmdArgs.push_back("-lgcc_eh");
-  else if (!Args.hasArg(options::OPT_shared) && D.CCCIsCXX)
+  else if (!lgcc_added && !Args.hasArg(options::OPT_shared) && D.CCCIsCXX)
     CmdArgs.push_back("-lgcc");
 
   if (!StaticLibgcc && isAndroid)
