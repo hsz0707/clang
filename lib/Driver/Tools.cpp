@@ -2649,8 +2649,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   if (!Args.hasFlag(options::OPT_fglobal_ctor_const_promotion,
-                    options::OPT_fno_global_ctor_const_promotion, false)) {
-    CmdArgs.push_back("-backend-option");
+                    options::OPT_fno_global_ctor_const_promotion, !isAndroid)) {
+    CmdArgs.push_back("-mllvm");
     CmdArgs.push_back("-disable-global-ctor-const-promotion");
   }
 
@@ -3074,6 +3074,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       CmdArgs.push_back("-fcxx-missing-return-semantics");
     else
       CmdArgs.push_back("-fno-cxx-missing-return-semantics");
+  } else if (isAndroid) {
+    // For Android, we prefer to disable C++ missing return semantics when
+    // the user didn't specify the option.
+    CmdArgs.push_back("-fno-cxx-missing-return-semantics");
   }
 
   Args.AddLastArg(CmdArgs, options::OPT_dM);
