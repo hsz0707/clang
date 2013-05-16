@@ -3936,6 +3936,9 @@ class AndroidNDKTargetInfo : public TargetInfo {
 public:
   AndroidNDKTargetInfo(const std::string& TripleStr);
 
+  virtual void getArchDefines(const LangOptions &Opts,
+                              MacroBuilder &Builder) const;
+
   virtual void getTargetDefines(const LangOptions& Opts,
                                 MacroBuilder& Builder) const;
 
@@ -3994,10 +3997,17 @@ AndroidNDKTargetInfo::AndroidNDKTargetInfo(const std::string& Triple)
                       "v128:64:128-a0:0:64-n32-S64";
 }
 
+void AndroidNDKTargetInfo::getArchDefines(const LangOptions& Opts,
+                                         MacroBuilder& Builder) const {
+  Builder.defineMacro("__le32__");
+  Builder.defineMacro("__ANDROID__");
+}
+
 void AndroidNDKTargetInfo::getTargetDefines(const LangOptions& Opts,
                                          MacroBuilder& Builder) const {
-  Builder.defineMacro("__ANDROID__");
   Builder.defineMacro("__ELF__");
+  Builder.defineMacro("__LITTLE_ENDIAN__");
+  getArchDefines(Opts, Builder);
 }
 
 } // end anonymous namespace
