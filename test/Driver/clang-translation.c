@@ -210,4 +210,4 @@
 // RUN:        --sysroot=%S/Inputs/basic_android_tree/sysroot \
 // RUN:   | FileCheck --check-prefix=ANDROID-X86 %s
 // ANDROID-X86: clang
-// ANDROID-X86: "-target-cpu" "core2"
+// ANDROID-X86: "-target-cpu" "i686"

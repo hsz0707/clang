@@ -1334,7 +1334,7 @@ static const char *getX86TargetCPU(const ArgList &Args,
   // All x86 devices running Android have core2 as their common
   // denominator. This makes a better choice than pentium4.
   if (Triple.getEnvironment() == llvm::Triple::Android)
-    return "core2";
+    return "i686";
 
   // Everything else goes to x86-64 in 64-bit mode.
   if (Is64Bit)
