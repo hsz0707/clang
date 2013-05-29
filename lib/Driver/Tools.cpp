@@ -1432,7 +1432,13 @@ static void AddGoldPlugin(const ToolChain &ToolChain, const ArgList &Args,
   // as gold requires -plugin to come before any -plugin-opt that -Wl might
   // forward.
   CmdArgs.push_back("-plugin");
+#if defined(_WIN32)
+  std::string Plugin = ToolChain.getDriver().Dir + "/LLVMgold.dll";
+#elif defined(__APPLE__)
+  std::string Plugin = ToolChain.getDriver().Dir + "/../lib/LLVMgold.dylib";
+#else
   std::string Plugin = ToolChain.getDriver().Dir + "/../lib/LLVMgold.so";
+#endif
   CmdArgs.push_back(Args.MakeArgString(Plugin));
 
   // Try to pass driver level flags relevant to LTO code generation down to
