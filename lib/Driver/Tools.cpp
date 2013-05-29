@@ -1429,6 +1429,11 @@ static void getX86TargetFeatures(const llvm::Triple &Triple,
     Features.push_back("-fsgsbase");
   }
 
+  if (Triple.getEnvironment() == llvm::Triple::Android) {
+    // Add sse3 feature
+    Features.push_back("+sse3");
+  }
+
   // Now add any that the user explicitly requested on the command line,
   // which may override the defaults.
   for (arg_iterator it = Args.filtered_begin(options::OPT_m_x86_Features_Group),
