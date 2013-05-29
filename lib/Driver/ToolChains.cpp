@@ -1100,7 +1100,6 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
   llvm::Triple BiarchVariantTriple =
       TargetTriple.isArch32Bit() ? TargetTriple.get64BitArchVariant()
                                  : TargetTriple.get32BitArchVariant();
-  llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
   // The library directories which may contain GCC installations.
   SmallVector<StringRef, 4> CandidateLibDirs, CandidateBiarchLibDirs;
   // The compatible GCC triples for this particular architecture.
@@ -1146,7 +1145,7 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
       if (!llvm::sys::fs::exists(LibDir))
         continue;
       for (unsigned k = 0, ke = CandidateTripleAliases.size(); k < ke; ++k)
-        ScanLibDirForGCCTriple(TargetArch, Args, LibDir,
+        ScanLibDirForGCCTriple(TargetTriple, Args, LibDir,
                                CandidateTripleAliases[k]);
     }
     for (unsigned j = 0, je = CandidateBiarchLibDirs.size(); j < je; ++j) {
@@ -1155,7 +1154,7 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
         continue;
       for (unsigned k = 0, ke = CandidateBiarchTripleAliases.size(); k < ke;
            ++k)
-        ScanLibDirForGCCTriple(TargetArch, Args, LibDir,
+        ScanLibDirForGCCTriple(TargetTriple, Args, LibDir,
                                CandidateBiarchTripleAliases[k],
                                /*NeedsBiarchSuffix=*/ true);
     }
@@ -1440,9 +1439,39 @@ static bool hasCrtBeginObj(Twine Path) {
   return llvm::sys::fs::exists(Path + "/crtbegin.o");
 }
 
+static StringRef getARMTargetABISuffix(const llvm::Triple &TargetTriple,
+                                       const ArgList &Args) {
+  bool IsV7a = false;
+  bool IsThumb = TargetTriple.getArch() == llvm::Triple::thumb;
+
+  // Get IsV7a from target triple
+  StringRef ArchName(TargetTriple.getArchName());
+  if (ArchName.startswith("armv7") || ArchName.startswith("thumbv7")) {
+    IsV7a = true;
+  }
+
+  // Override target triple with -march
+  if (const Arg *A = Args.getLastArg(options::OPT_march_EQ)) {
+    IsV7a = (strcmp(A->getValue(), "armv7-a") == 0);
+  }
+
+  // Override target triple with -mthumb or -mno-thumb
+  if (const Arg *A = Args.getLastArg(options::OPT_mthumb,
+                                     options::OPT_mno_thumb)) {
+    IsThumb = A->getOption().matches(options::OPT_mthumb);
+  }
+
+  if (IsV7a) {
+    return IsThumb ? "/armv7-a/thumb" : "/armv7-a";
+  } else {
+    return IsThumb ? "/thumb" : "";
+  }
+}
+
 static bool findTargetBiarchSuffix(std::string &Suffix, StringRef Path,
-                                   llvm::Triple::ArchType TargetArch,
+                                   const llvm::Triple &TargetTriple,
                                    const ArgList &Args) {
+  llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
   // FIXME: This routine was only intended to model bi-arch toolchains which
   // use -m32 and -m64 to swap between variants of a target. It shouldn't be
   // doing ABI-based builtin location for MIPS.
@@ -1456,6 +1485,9 @@ static bool findTargetBiarchSuffix(std::string &Suffix, StringRef Path,
     Suffix = "/64";
   else
     Suffix = "/32";
+
+  if (TargetArch == llvm::Triple::arm || TargetArch == llvm::Triple::thumb)
+    Suffix = getARMTargetABISuffix(TargetTriple, Args);
 
   return hasCrtBeginObj(Path + Suffix);
 }
@@ -1552,9 +1584,11 @@ void Generic_GCC::GCCInstallationDetector::findMIPSABIDirSuffix(
 }
 
 void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
-    llvm::Triple::ArchType TargetArch, const ArgList &Args,
+    const llvm::Triple &TargetTriple, const ArgList &Args,
     const std::string &LibDir, StringRef CandidateTriple,
     bool NeedsBiarchSuffix) {
+  llvm::Triple::ArchType TargetArch = TargetTriple.getArch();
+
   // There are various different suffixes involving the triple we
   // check for. We also record what is necessary to walk from each back
   // up to the lib directory.
@@ -1612,7 +1646,7 @@ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
       std::string BiarchSuffix;
       if (findTargetBiarchSuffix(BiarchSuffix,
                                  LI->path() + MIPSABIDirSuffix,
-                                 TargetArch, Args)) {
+                                 TargetTriple, Args)) {
         GCCBiarchSuffix = BiarchSuffix;
       } else if (NeedsBiarchSuffix ||
                  !hasCrtBeginObj(LI->path() + MIPSABIDirSuffix)) {

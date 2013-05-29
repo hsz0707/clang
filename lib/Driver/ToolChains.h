@@ -140,7 +140,7 @@ protected:
                              SmallVectorImpl<StringRef> &BiarchLibDirs,
                              SmallVectorImpl<StringRef> &BiarchTripleAliases);
 
-    void ScanLibDirForGCCTriple(llvm::Triple::ArchType TargetArch,
+    void ScanLibDirForGCCTriple(const llvm::Triple &TargetTriple,
                                 const llvm::opt::ArgList &Args,
                                 const std::string &LibDir,
                                 StringRef CandidateTriple,
