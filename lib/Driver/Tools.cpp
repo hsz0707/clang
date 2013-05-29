@@ -44,7 +44,13 @@ using namespace clang::driver::tools;
 using namespace clang;
 using namespace llvm::opt;
 
-static void addAssemblerKPIC(const ArgList &Args, ArgStringList &CmdArgs) {
+static void addAssemblerKPIC(const ArgList &Args, ArgStringList &CmdArgs,
+                             bool IsAndroid) {
+  if (IsAndroid) {
+    CmdArgs.push_back("-KPIC");
+    return;
+  }
+
   Arg *LastPICArg = Args.getLastArg(options::OPT_fPIC, options::OPT_fno_PIC,
                                     options::OPT_fpic, options::OPT_fno_pic,
                                     options::OPT_fPIE, options::OPT_fno_PIE,
@@ -6186,7 +6192,7 @@ void openbsd::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
   }
 
   if (NeedsKPIC)
-    addAssemblerKPIC(Args, CmdArgs);
+    addAssemblerKPIC(Args, CmdArgs, false);
 
   Args.AddAllArgValues(CmdArgs, options::OPT_Wa_COMMA,
                        options::OPT_Xassembler);
@@ -6503,7 +6509,7 @@ void freebsd::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
     else
       CmdArgs.push_back("-EL");
 
-    addAssemblerKPIC(Args, CmdArgs);
+    addAssemblerKPIC(Args, CmdArgs, false);
   } else if (getToolChain().getArch() == llvm::Triple::arm ||
              getToolChain().getArch() == llvm::Triple::armeb ||
              getToolChain().getArch() == llvm::Triple::thumb ||
@@ -6535,7 +6541,7 @@ void freebsd::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
     else
       CmdArgs.push_back("-Av9a");
 
-    addAssemblerKPIC(Args, CmdArgs);
+    addAssemblerKPIC(Args, CmdArgs, false);
   }
 
   Args.AddAllArgValues(CmdArgs, options::OPT_Wa_COMMA,
@@ -6776,19 +6782,19 @@ void netbsd::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
     else
       CmdArgs.push_back("-EL");
 
-    addAssemblerKPIC(Args, CmdArgs);
+    addAssemblerKPIC(Args, CmdArgs, false);
     break;
   }
 
   case llvm::Triple::sparc:
     CmdArgs.push_back("-32");
-    addAssemblerKPIC(Args, CmdArgs);
+    addAssemblerKPIC(Args, CmdArgs, false);
     break;
 
   case llvm::Triple::sparcv9:
     CmdArgs.push_back("-64");
     CmdArgs.push_back("-Av9");
-    addAssemblerKPIC(Args, CmdArgs);
+    addAssemblerKPIC(Args, CmdArgs, false);
     break;
 
   default:
@@ -7144,8 +7150,10 @@ void gnutools::Assemble::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back(Args.MakeArgString("-march=" + CPUName));
   }
 
+  bool IsAndroid = (getToolChain().getTriple().getEnvironment() ==
+                    llvm::Triple::Android);
   if (NeedsKPIC)
-    addAssemblerKPIC(Args, CmdArgs);
+    addAssemblerKPIC(Args, CmdArgs, IsAndroid);
 
   Args.AddAllArgValues(CmdArgs, options::OPT_Wa_COMMA,
                        options::OPT_Xassembler);
