@@ -2773,7 +2773,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   llvm::Triple Triple(TripleStr);
   if (KernelOrKext && (!Triple.isiOS() || Triple.isOSVersionLT(6)))
     PIC = PIE = false;
-  if (Args.hasArg(options::OPT_static))
+  if (Args.hasArg(options::OPT_static) &&
+      getToolChain().getTriple().getEnvironment() != llvm::Triple::Android)
     PIC = PIE = false;
 
   if (Arg *A = Args.getLastArg(options::OPT_mdynamic_no_pic)) {
