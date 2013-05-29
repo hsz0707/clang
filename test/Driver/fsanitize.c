@@ -127,7 +127,7 @@
 // CHECK-ANDROID-ASAN-NO-PIE: "-pie"
 
 // RUN: %clang -target arm-linux-androideabi %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-ANDROID-NO-ASAN
-// CHECK-ANDROID-NO-ASAN: "-mrelocation-model" "static"
+// CHECK-ANDROID-NO-ASAN: "-mrelocation-model" "pic"
 
 // RUN: %clang -target arm-linux-androideabi -fsanitize=address -fsanitize-address-zero-base-shadow %s -### 2>&1 | FileCheck %s --check-prefix=CHECK-ANDROID-ASAN-ZERO-BASE
 // CHECK-ANDROID-ASAN-ZERO-BASE-NOT: argument unused during compilation
