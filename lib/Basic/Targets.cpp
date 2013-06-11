@@ -3243,10 +3243,16 @@ class X86_32TargetInfo : public X86TargetInfo {
 public:
   X86_32TargetInfo(const llvm::Triple &Triple) : X86TargetInfo(Triple) {
     DoubleAlign = LongLongAlign = 32;
-    LongDoubleWidth = 96;
     LongDoubleAlign = 32;
     SuitableAlign = 128;
-    DescriptionString = "e-m:e-p:32:32-f64:32:64-f80:32-n8:16:32-S128";
+    if (Triple.getEnvironment() == llvm::Triple::Android) {
+      LongDoubleWidth = 64;
+      LongDoubleFormat = &llvm::APFloat::IEEEdouble;
+      DescriptionString = "e-m:e-p:32:32-f64:32:64-n8:16:32-S128";
+    } else {
+      LongDoubleWidth = 96;
+      DescriptionString = "e-m:e-p:32:32-f64:32:64-f80:32-n8:16:32-S128";
+    }
     SizeType = UnsignedInt;
     PtrDiffType = SignedInt;
     IntPtrType = SignedInt;
