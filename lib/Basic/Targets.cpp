@@ -2612,8 +2612,7 @@ public:
     llvm::Triple Triple = llvm::Triple(triple);
     const bool isAndroid = Triple.getEnvironment() == llvm::Triple::Android;
     DoubleAlign = LongLongAlign = 32;
-    if (!isAndroid)
-      LongDoubleWidth = 96;
+    LongDoubleWidth = isAndroid? 64 : 96;
     LongDoubleAlign = 32;
     SuitableAlign = 128;
     if (!isAndroid)
