@@ -306,15 +306,10 @@ public:
 };
 
 class LLVM_LIBRARY_VISIBILITY NDKClang : public ToolChain {
-protected:
-  mutable llvm::DenseMap<unsigned, Tool*> Tools;
 
 public:
   NDKClang(const Driver &D, const llvm::Triple& Triple, const llvm::opt::ArgList &Args);
   ~NDKClang();
-
-  virtual Tool &SelectTool(const Compilation &C, const JobAction &JA,
-                           const ActionList &Inputs) const;
 
   virtual bool IsUnwindTablesDefault() const;
   virtual bool UseSjLjExceptions() const;
@@ -323,6 +318,9 @@ public:
   virtual bool isPIEDefault() const;
   virtual bool isPICDefaultForced() const;
 
+protected:
+  virtual Tool *buildAssembler() const;
+  virtual Tool *buildLinker() const;
 };
 
   /// Darwin - The base Darwin tool chain.
