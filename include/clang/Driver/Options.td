@@ -262,6 +262,8 @@ def P : Flag<["-"], "P">, Flags<[CC1Option]>,
 def Qn : Flag<["-"], "Qn">;
 def Qunused_arguments : Flag<["-"], "Qunused-arguments">, Flags<[DriverOption, CoreOption]>,
   HelpText<"Don't emit warning for unused driver arguments">;
+def Qignore_c_std_not_allowed_with_cplusplus : Flag<["-"], "Qignore-c-std-not-allowed-with-cplusplus">, Flags<[DriverOption,CC1Option]>,
+  HelpText<"Ignore incompatible C -std= not allowed with C++/ObjC++">;
 def Q : Flag<["-"], "Q">;
 def Rpass_EQ : Joined<["-"], "Rpass=">, Group<R_value_Group>, Flags<[CC1Option]>,
   HelpText<"Report transformations performed by optimization passes whose "
