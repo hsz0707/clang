@@ -1881,8 +1881,14 @@ static bool ScanDirForExecutable(SmallString<128> &Dir,
 
 std::string Driver::GetProgramPath(const char *Name,
                                    const ToolChain &TC) const {
-  SmallVector<std::string, 2> TargetSpecificExecutables;
+  SmallVector<std::string, 4> TargetSpecificExecutables;
   generatePrefixedToolNames(Name, TC, TargetSpecificExecutables);
+
+#if defined(WIN32)
+  for (size_t i = 0, n = TargetSpecificExecutables.size(); i < n; ++i) {
+    TargetSpecificExecutables.push_back(TargetSpecificExecutables[i] + ".exe");
+  }
+#endif
 
   // Respect a limited subset of the '-Bprefix' functionality in GCC by
   // attempting to use this prefix when looking for program paths.
