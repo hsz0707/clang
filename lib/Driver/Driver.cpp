@@ -1804,23 +1804,27 @@ std::string Driver::GetFilePath(const char *Name, const ToolChain &TC) const {
 
 std::string Driver::GetProgramPath(const char *Name,
                                    const ToolChain &TC) const {
+  std::string ExeName(Name);
+#if defined(WIN32)
+  ExeName += ".exe";
+#endif
   // FIXME: Needs a better variable than DefaultTargetTriple
-  std::string TargetSpecificExecutable(DefaultTargetTriple + "-" + Name);
+  std::string TargetSpecificExeName(DefaultTargetTriple + "-" + ExeName);
   // Respect a limited subset of the '-Bprefix' functionality in GCC by
   // attempting to use this prefix when looking for program paths.
   for (Driver::prefix_list::const_iterator it = PrefixDirs.begin(),
        ie = PrefixDirs.end(); it != ie; ++it) {
     if (llvm::sys::fs::is_directory(*it)) {
       SmallString<128> P(*it);
-      llvm::sys::path::append(P, TargetSpecificExecutable);
+      llvm::sys::path::append(P, TargetSpecificExeName);
       if (llvm::sys::fs::can_execute(Twine(P)))
         return P.str();
       llvm::sys::path::remove_filename(P);
-      llvm::sys::path::append(P, Name);
+      llvm::sys::path::append(P, ExeName);
       if (llvm::sys::fs::can_execute(Twine(P)))
         return P.str();
     } else {
-      SmallString<128> P(*it + Name);
+      SmallString<128> P(*it + ExeName);
       if (llvm::sys::fs::can_execute(Twine(P)))
         return P.str();
     }
@@ -1830,17 +1834,18 @@ std::string Driver::GetProgramPath(const char *Name,
   for (ToolChain::path_list::const_iterator
          it = List.begin(), ie = List.end(); it != ie; ++it) {
     SmallString<128> P(*it);
-    llvm::sys::path::append(P, TargetSpecificExecutable);
+    llvm::sys::path::append(P, TargetSpecificExeName);
     if (llvm::sys::fs::can_execute(Twine(P)))
       return P.str();
     llvm::sys::path::remove_filename(P);
-    llvm::sys::path::append(P, Name);
+    llvm::sys::path::append(P, ExeName);
     if (llvm::sys::fs::can_execute(Twine(P)))
       return P.str();
   }
 
   // If all else failed, search the path.
-  std::string P(llvm::sys::FindProgramByName(TargetSpecificExecutable));
+  std::string TargetSpecificName(DefaultTargetTriple + "-" + Name);
+  std::string P(llvm::sys::FindProgramByName(TargetSpecificName));
   if (!P.empty())
     return P;
 
