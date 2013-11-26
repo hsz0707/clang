@@ -1057,10 +1057,12 @@ void Driver::BuildInputs(const ToolChain &TC, DerivedArgList &Args,
           // If the driver is invoked as C++ compiler (like clang++ or c++) it
           // should autodetect some input files as C++ for g++ compatibility.
           if (CCCIsCXX()) {
+            const bool IsAndroid = (TC.getTriple().getEnvironment() ==
+                                    llvm::Triple::Android);
             types::ID OldTy = Ty;
             Ty = types::lookupCXXTypeForCType(Ty);
 
-            if (Ty != OldTy)
+            if (Ty != OldTy && !IsAndroid)
               Diag(clang::diag::warn_drv_treating_input_as_cxx)
                 << getTypeName(OldTy) << getTypeName(Ty);
           }
