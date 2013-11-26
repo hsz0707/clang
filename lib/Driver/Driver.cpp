@@ -1790,8 +1790,16 @@ std::string Driver::GetFilePath(const char *Name, const ToolChain &TC) const {
 
 std::string Driver::GetProgramPath(const char *Name,
                                    const ToolChain &TC) const {
+  std::string N(Name);
+#ifdef __MINGW32__
+  // We expect callers never pass Name ends with uppercase ".EXE"
+  std::string Suffix(".exe");
+  if (N.length() < Suffix.length() ||
+      (N.compare(N.length() - Suffix.length(), Suffix.length(), Suffix)) != 0)
+    N += ".exe";
+#endif
   // FIXME: Needs a better variable than DefaultTargetTriple
-  std::string TargetSpecificExecutable(DefaultTargetTriple + "-" + Name);
+  std::string TargetSpecificExecutable(DefaultTargetTriple + "-" + N);
   // Respect a limited subset of the '-Bprefix' functionality in GCC by
   // attempting to use this prefix when looking for program paths.
   for (Driver::prefix_list::const_iterator it = PrefixDirs.begin(),
@@ -1802,11 +1810,11 @@ std::string Driver::GetProgramPath(const char *Name,
       if (llvm::sys::fs::can_execute(Twine(P)))
         return P.str();
       llvm::sys::path::remove_filename(P);
-      llvm::sys::path::append(P, Name);
+      llvm::sys::path::append(P, N);
       if (llvm::sys::fs::can_execute(Twine(P)))
         return P.str();
     } else {
-      SmallString<128> P(*it + Name);
+      SmallString<128> P(*it + N);
       if (llvm::sys::fs::can_execute(Twine(P)))
         return P.str();
     }
@@ -1820,7 +1828,7 @@ std::string Driver::GetProgramPath(const char *Name,
     if (llvm::sys::fs::can_execute(Twine(P)))
       return P.str();
     llvm::sys::path::remove_filename(P);
-    llvm::sys::path::append(P, Name);
+    llvm::sys::path::append(P, N);
     if (llvm::sys::fs::can_execute(Twine(P)))
       return P.str();
   }
@@ -1830,10 +1838,11 @@ std::string Driver::GetProgramPath(const char *Name,
   if (!P.empty())
     return P;
 
-  P = llvm::sys::FindProgramByName(Name);
+  P = llvm::sys::FindProgramByName(N);
   if (!P.empty())
     return P;
 
+  // Return the original Name, not N
   return Name;
 }
 
