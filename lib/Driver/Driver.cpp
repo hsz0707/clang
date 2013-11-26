@@ -351,8 +351,17 @@ Compilation *Driver::BuildCompilation(ArrayRef<const char *> ArgList) {
     A->claim();
     PrefixDirs.push_back(A->getValue(0));
   }
-  if (const Arg *A = Args->getLastArg(options::OPT__sysroot_EQ))
+  if (const Arg *A = Args->getLastArg(options::OPT__sysroot_EQ)) {
     SysRoot = A->getValue();
+  }
+  else {
+    SmallString<128> SysRootCandidate(Dir);
+    llvm::sys::path::append(SysRootCandidate, "..");
+    llvm::sys::path::append(SysRootCandidate, "sysroot");
+    bool Exists = false;
+    if (!llvm::sys::fs::exists(SysRootCandidate.c_str(), Exists) && Exists)
+      SysRoot = SysRootCandidate.str();
+  }
   if (const Arg *A = Args->getLastArg(options::OPT__dyld_prefix_EQ))
     DyldPrefix = A->getValue();
   if (Args->hasArg(options::OPT_nostdlib))
