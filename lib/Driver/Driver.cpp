@@ -1143,7 +1143,11 @@ void Driver::BuildActions(const ToolChain &TC, DerivedArgList &Args,
   phases::ID FinalPhase = getFinalPhase(Args, &FinalPhaseArg);
 
   if (FinalPhase == phases::Link && Args.hasArg(options::OPT_emit_llvm)) {
-    Diag(clang::diag::err_drv_emit_llvm_link);
+    // Allow linking with -emit-llvm for le32-none-ndk
+    if (TC.getTriple().getArch() != llvm::Triple::le32 ||
+        TC.getTriple().getOS() != llvm::Triple::NDK) {
+      Diag(clang::diag::err_drv_emit_llvm_link);
+    }
   }
 
   // Reject -Z* at the top level, these options should never have been exposed
