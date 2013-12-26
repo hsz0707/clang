@@ -1417,6 +1417,7 @@ static bool hasCrtBeginObj(Twine Path) {
 static StringRef getARMTargetABISuffix(const llvm::Triple &TargetTriple,
                                        const ArgList &Args) {
   bool IsV7a = false;
+  bool IsHard = false;
   bool IsThumb = TargetTriple.getArch() == llvm::Triple::thumb;
 
   // Get IsV7a from target triple
@@ -1429,6 +1430,18 @@ static StringRef getARMTargetABISuffix(const llvm::Triple &TargetTriple,
   if (const Arg *A = Args.getLastArg(options::OPT_march_EQ)) {
     IsV7a = (strcmp(A->getValue(), "armv7-a") == 0);
   }
+  if (IsV7a) {
+    if (Arg *A = Args.getLastArg(options::OPT_msoft_float,
+                                 options::OPT_mhard_float,
+                                 options::OPT_mfloat_abi_EQ)) {
+      if (A->getOption().matches(options::OPT_mhard_float)) {
+        IsHard = true;
+      } else if (A->getOption().matches(options::OPT_mfloat_abi_EQ) &&
+               A->getValue() == StringRef("hard")) {
+        IsHard = true;
+      }
+    }
+  }
 
   // Override target triple with -mthumb or -mno-thumb
   if (const Arg *A = Args.getLastArg(options::OPT_mthumb,
@@ -1437,7 +1450,11 @@ static StringRef getARMTargetABISuffix(const llvm::Triple &TargetTriple,
   }
 
   if (IsV7a) {
-    return IsThumb ? "/armv7-a/thumb" : "/armv7-a";
+    if (IsHard) {
+      return IsThumb ? "/armv7-a/thumb/hard" : "/armv7-a/hard";
+    } else {
+      return IsThumb ? "/armv7-a/thumb" : "/armv7-a";
+    }
   } else {
     return IsThumb ? "/thumb" : "";
   }
