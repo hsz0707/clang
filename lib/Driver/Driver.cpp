@@ -102,6 +102,10 @@ void Driver::ParseDriverMode(ArrayRef<const char *> Args) {
   }
 }
 
+static llvm::Triple computeTargetTriple(StringRef DefaultTargetTriple,
+                                        const ArgList &Args,
+                                        StringRef DarwinArchName);
+
 InputArgList *Driver::ParseArgStrings(ArrayRef<const char *> ArgList) {
   llvm::PrettyStackTraceString CrashInfo("Command line argument parsing");
 
@@ -138,9 +142,14 @@ InputArgList *Driver::ParseArgStrings(ArrayRef<const char *> ArgList) {
     }
   }
 
+  llvm::Triple Target = computeTargetTriple(DefaultTargetTriple, *Args, "");
+  const bool IsAndroid = Target.getEnvironment() == llvm::Triple::Android;
   for (arg_iterator it = Args->filtered_begin(options::OPT_UNKNOWN),
          ie = Args->filtered_end(); it != ie; ++it) {
-    Diags.Report(diag::err_drv_unknown_argument) << (*it) ->getAsString(*Args);
+    if (IsAndroid)
+      Diags.Report(diag::warn_drv_unknown_argument) << (*it)->getAsString(*Args);
+    else
+      Diags.Report(diag::err_drv_unknown_argument) << (*it)->getAsString(*Args);
   }
 
   return Args;
