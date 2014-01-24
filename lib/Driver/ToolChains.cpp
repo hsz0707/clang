@@ -1159,7 +1159,8 @@ Generic_GCC::GCCInstallationDetector::GCCInstallationDetector(
     "i386-redhat-linux",
     "i586-suse-linux",
     "i486-slackware-linux",
-    "i686-montavista-linux"
+    "i686-montavista-linux",
+    "x86_64-linux-android"
   };
 
   static const char *const MIPSLibDirs[] = { "/lib" };

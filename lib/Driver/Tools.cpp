@@ -6134,9 +6134,12 @@ void gnutools::Link::ConstructJob(Compilation &C, const JobAction &JA,
       (!Args.hasArg(options::OPT_static) &&
        !Args.hasArg(options::OPT_shared))) {
     CmdArgs.push_back("-dynamic-linker");
-    if (isAndroid)
-      CmdArgs.push_back("/system/bin/linker");
-    else if (ToolChain.getArch() == llvm::Triple::x86)
+    if (isAndroid) {
+      if (ToolChain.getTriple().isArch64Bit())
+        CmdArgs.push_back("/system/bin/linker64");
+      else
+        CmdArgs.push_back("/system/bin/linker");
+    } else if (ToolChain.getArch() == llvm::Triple::x86)
       CmdArgs.push_back("/lib/ld-linux.so.2");
     else if (ToolChain.getArch() == llvm::Triple::aarch64)
       CmdArgs.push_back("/lib/ld-linux-aarch64.so.1");
