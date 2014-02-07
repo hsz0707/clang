@@ -318,6 +318,7 @@ public:
   virtual bool isPICDefault() const;
   virtual bool isPIEDefault() const;
   virtual bool isPICDefaultForced() const;
+  virtual bool IsIntegratedAssemblerDefault() const { return true; }
 
 protected:
   virtual Tool *buildAssembler() const;

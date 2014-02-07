@@ -671,21 +671,11 @@ class AndroidTargetInfo : public OSTargetInfo<Target> {
  protected:
   virtual void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
                             MacroBuilder &Builder) const {
-    DefineStd(Builder, "unix", Opts);
-    DefineStd(Builder, "linux", Opts);
-    Builder.defineMacro("__gnu_linux__");
-    Builder.defineMacro("__ELF__");
-    Builder.defineMacro("__ANDROID__", "1");
-    if (Opts.POSIXThreads)
-      Builder.defineMacro("_REENTRANT");
-    if (Opts.CPlusPlus)
-      Builder.defineMacro("_GNU_SOURCE");
+    Builder.defineMacro("__le32__");
   }
  public:
   AndroidTargetInfo(const llvm::Triple &triple)
     : OSTargetInfo<Target>(triple) {
-    this->NoAsmVariants = true;
-
     this->DoubleAlign = 64;
     this->LongLongAlign = 64;
     this->LongDoubleAlign = 64;
@@ -695,8 +685,6 @@ class AndroidTargetInfo : public OSTargetInfo<Target> {
     this->PtrDiffType = TargetInfo::SignedInt;
     this->IntPtrType = TargetInfo::SignedInt;
 
-    this->MaxAtomicPromoteWidth = 64;
-    this->MaxAtomicInlineWidth = 64;
     this->RegParmMax = 3;
     this->UseZeroLengthBitfieldAlignment = true;
 
@@ -707,6 +695,38 @@ class AndroidTargetInfo : public OSTargetInfo<Target> {
                               "v128:64:128-a0:0:64-n32-S64";
   }
 };
+
+template <typename Target>
+class Android64TargetInfo : public OSTargetInfo<Target> {
+ protected:
+  virtual void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
+                            MacroBuilder &Builder) const {
+    Builder.defineMacro("__le64__");
+  }
+ public:
+  Android64TargetInfo(const llvm::Triple &triple)
+    : OSTargetInfo<Target>(triple) {
+    this->LongWidth = this->LongAlign = 64;
+    this->PointerWidth = this->PointerAlign = 64;
+    this->DoubleWidth = this->DoubleAlign = 64;
+    this->LongLongWidth = this->LongLongAlign = 64;
+    this->LongDoubleWidth = this->LongDoubleAlign = 128;
+    this->LongDoubleFormat = &llvm::APFloat::IEEEquad;
+
+    this->WCharType = this->UnsignedInt;
+    this->SizeType = TargetInfo::UnsignedLong;
+    this->PtrDiffType = TargetInfo::SignedLong;
+    this->IntPtrType = TargetInfo::SignedLong;
+
+    this->TheCXXABI.set(TargetCXXABI::GenericAArch64);
+    this->SuitableAlign = 128;
+
+    this->DescriptionString = "e-p:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
+                              "i64:64:64-f32:32:32-f64:64:64-"
+                              "f128:128:128-n32:64-S128";
+  }
+};
+
 } // end anonymous namespace.
 
 //===----------------------------------------------------------------------===//
@@ -6362,7 +6382,11 @@ public:
                                 MacroBuilder& Builder) const;
 
   virtual BuiltinVaListKind getBuiltinVaListKind() const {
-    return TargetInfo::CharPtrBuiltinVaList;
+    if (getTriple().getArch() == llvm::Triple::le32) {
+      return TargetInfo::CharPtrBuiltinVaList;
+    } else {
+      return TargetInfo::AArch64ABIBuiltinVaList;
+    }
   }
 
   virtual void getTargetBuiltins(const Builtin::Info*& Records,
@@ -6389,6 +6413,10 @@ public:
                                      TargetInfo::ConstraintInfo& Info) const {
     return false;
   }
+
+  virtual const char *getStaticInitSectionSpecifier() const {
+    return ".text.startup";
+  }
 };
 
 AndroidNDKTargetInfo::AndroidNDKTargetInfo(const llvm::Triple& Triple)
@@ -6396,37 +6424,28 @@ AndroidNDKTargetInfo::AndroidNDKTargetInfo(const llvm::Triple& Triple)
   BigEndian = false;
   NoAsmVariants = true;
 
-  DoubleAlign = 64;
-  LongLongAlign = 64;
-  LongDoubleAlign = 64;
-  SuitableAlign = 64;
-
-  SizeType = UnsignedInt;
-  PtrDiffType = SignedInt;
-  IntPtrType = SignedInt;
-
   MaxAtomicPromoteWidth = 64;
   MaxAtomicInlineWidth = 64;
   RegParmMax = 3;
   UseZeroLengthBitfieldAlignment = true;
-
-  TheCXXABI.set(TargetCXXABI::GenericARM);
-
-  DescriptionString = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-"
-                      "i64:32:64-f32:32:32-f64:32:64-v64:64:64-"
-                      "v128:64:128-a0:0:64-n32-S64";
 }
 
 void AndroidNDKTargetInfo::getArchDefines(const LangOptions& Opts,
                                          MacroBuilder& Builder) const {
-  Builder.defineMacro("__le32__");
   Builder.defineMacro("__ANDROID__");
 }
 
 void AndroidNDKTargetInfo::getTargetDefines(const LangOptions& Opts,
                                          MacroBuilder& Builder) const {
+  DefineStd(Builder, "unix", Opts);
+  DefineStd(Builder, "linux", Opts);
+  Builder.defineMacro("__gnu_linux__");
   Builder.defineMacro("__ELF__");
   Builder.defineMacro("__LITTLE_ENDIAN__");
+  if (Opts.POSIXThreads)
+    Builder.defineMacro("_REENTRANT");
+  if (Opts.CPlusPlus)
+    Builder.defineMacro("_GNU_SOURCE");
   getArchDefines(Opts, Builder);
 }
 } // end anonymous namespace
@@ -6761,7 +6780,12 @@ static TargetInfo *AllocateTarget(const llvm::Triple &Triple) {
     }
 
   case llvm::Triple::le64:
-    return new Le64TargetInfo(Triple);
+    switch (os) {
+      case llvm::Triple::NDK:
+        return new Android64TargetInfo<AndroidNDKTargetInfo>(Triple);
+      default:
+        return new Le64TargetInfo(Triple);
+    }
 
   case llvm::Triple::ppc:
     if (Triple.isOSDarwin())
