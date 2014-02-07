@@ -1138,9 +1138,13 @@ void Driver::BuildActions(const ToolChain &TC, DerivedArgList &Args,
   phases::ID FinalPhase = getFinalPhase(Args, &FinalPhaseArg);
 
   if (FinalPhase == phases::Link && Args.hasArg(options::OPT_emit_llvm)) {
-    // Allow linking with -emit-llvm for le32-none-ndk
-    if (TC.getTriple().getArch() != llvm::Triple::le32 ||
-        TC.getTriple().getOS() != llvm::Triple::NDK) {
+    // Allow linking with -emit-llvm for le*-none-ndk
+    if (TC.getTriple().getOS() == llvm::Triple::NDK) {
+      if (TC.getTriple().getArch() != llvm::Triple::le32 &&
+          TC.getTriple().getArch() != llvm::Triple::le64) {
+        Diag(clang::diag::err_drv_emit_llvm_link);
+      }
+    } else {
       Diag(clang::diag::err_drv_emit_llvm_link);
     }
   }
@@ -1193,9 +1197,10 @@ void Driver::BuildActions(const ToolChain &TC, DerivedArgList &Args,
     types::ID InputType = Inputs[i].first;
     const Arg *InputArg = Inputs[i].second;
 
-    // Let le32-none-ndk treats .bc as .o, so that we don't need to do
+    // Let le*-none-ndk treats .bc as .o, so that we don't need to do
     // the extra compile actions.
-    if (TC.getTriple().getArch() == llvm::Triple::le32 &&
+    if ((TC.getTriple().getArch() == llvm::Triple::le32 ||
+         TC.getTriple().getArch() == llvm::Triple::le64) &&
         TC.getTriple().getOS() == llvm::Triple::NDK) {
       if (InputType == types::TY_LLVM_BC)
         InputType = types::TY_Object;
@@ -1986,7 +1991,8 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
         TC = new toolchains::Linux(*this, Target, Args);
       break;
     case llvm::Triple::NDK:
-      if (Target.getArch() == llvm::Triple::le32)
+      if (Target.getArch() == llvm::Triple::le32 ||
+          Target.getArch() == llvm::Triple::le64)
         TC = new toolchains::NDKClang(*this, Target, Args);
       assert(TC && "Unexpected target arch for NDK toolchain");
       break;

@@ -598,6 +598,8 @@ static bool isSignedCharDefault(const llvm::Triple &Triple) {
   default:
     return true;
 
+  case llvm::Triple::le32:  // We follow ARM basically, but not sure for now
+  case llvm::Triple::le64:
   case llvm::Triple::aarch64:
   case llvm::Triple::arm:
   case llvm::Triple::ppc:
@@ -3755,7 +3757,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // le32-specific flags: 
   //  -fno-math-builtin: clang should not convert math builtins to intrinsics
   //                     by default.
-  if (getToolChain().getArch() == llvm::Triple::le32) {
+  if (getToolChain().getArch() == llvm::Triple::le32 ||
+      getToolChain().getArch() == llvm::Triple::le64) {
+    // This is a specific flag for PNaCl in upstream, but it should be
+    // harmless for le32/le64 NDK too.
     CmdArgs.push_back("-fno-math-builtin");
   }
 
@@ -3792,6 +3797,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
              llvm::Triple::Android) {
     // For Android, we prefer to disable C++ missing return semantics when
     // the user didn't specify the option.
+    CmdArgs.push_back("-fno-cxx-missing-return-semantics");
+  } else if (getToolChain().getArch() == llvm::Triple::le32 ||
+             getToolChain().getArch() == llvm::Triple::le64) {
+    // Same reason for pndk
     CmdArgs.push_back("-fno-cxx-missing-return-semantics");
   }
 
@@ -6518,6 +6527,10 @@ void ndktools::Link::ConstructJob(Compilation &C, const JobAction &JA,
 
   // Silence warning for -emit-llvm
   Args.ClaimAllArgs(options::OPT_emit_llvm);
+
+  if (Args.hasArg(options::OPT_pie) && !Args.hasArg(options::OPT_shared)) {
+    CmdArgs.push_back("-pie");
+  }
 
   if (Args.hasArg(options::OPT_shared)) {
     CmdArgs.push_back("-shared");
