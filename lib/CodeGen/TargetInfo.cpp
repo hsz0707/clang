@@ -5887,14 +5887,18 @@ void AndroidABIInfo::computeInfo(CGFunctionInfo &FI) const {
 
 llvm::Value *AndroidABIInfo::EmitVAArg(llvm::Value *VAListAddr, QualType Ty,
                                        CodeGenFunction &CGF) const {
-  CGBuilderTy &Builder = CGF.Builder;
-  llvm::Type *PTy =
-    llvm::PointerType::getUnqual(CGF.ConvertType(Ty));
+  if (getTarget().getTriple().getArch() == llvm::Triple::le64) {
+    return NULL;  // Let it generate llvm::VAArgInst
+  } else {
+    CGBuilderTy &Builder = CGF.Builder;
+    llvm::Type *PTy =
+      llvm::PointerType::getUnqual(CGF.ConvertType(Ty));
 
-  // Since ABIInfo::EmitVAArg should return a pointer of Ty,
-  // We emit va_arg i8** va_list, Ty* for Ty
-  llvm::Value *v = Builder.CreateVAArg(VAListAddr, PTy);
-  return v;
+    // Since ABIInfo::EmitVAArg should return a pointer of Ty,
+    // We emit va_arg i8** va_list, Ty* for Ty
+    llvm::Value *v = Builder.CreateVAArg(VAListAddr, PTy);
+    return v;
+  }
 }
 
 
@@ -6841,6 +6845,9 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
       return *(TheTargetCodeGenInfo = new AndroidTargetCodeGenInfo(Types));
     else
       return *(TheTargetCodeGenInfo = new PNaClTargetCodeGenInfo(Types));
+  case llvm::Triple::le64:
+    if (Triple.getOS() == llvm::Triple::NDK)
+      return *(TheTargetCodeGenInfo = new AndroidTargetCodeGenInfo(Types));
   case llvm::Triple::mips:
   case llvm::Triple::mipsel:
     return *(TheTargetCodeGenInfo = new MIPSTargetCodeGenInfo(Types, true));
