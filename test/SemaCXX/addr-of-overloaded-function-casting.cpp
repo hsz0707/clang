@@ -1,8 +1,8 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s
 void g();
 
-void f(); // expected-note 9{{candidate function}}
-void f(int); // expected-note 9{{candidate function}}
+void f(); // expected-note 11{{candidate function}}
+void f(int); // expected-note 11{{candidate function}}
 
 template<class T> void t(T); // expected-note 6{{candidate function}}
 template<class T> void t(T*); // expected-note 6{{candidate function}}
@@ -54,4 +54,14 @@ int main()
   { bool b = static_cast<int (&)(char)>(t); } // expected-error{{does not match required}}
   
   { bool b = static_cast<void (&)(char)>(f); } // expected-error{{does not match}}
+
+  {
+    // The error should be reported when casting overloaded function to the
+    // compatible function type (not to be confused with function pointer or
+    // function reference type.)
+
+    typedef void (f_type)(int);
+    f_type f_cast_a = static_cast<f_type>(f); // expected-error{{address of overloaded function}} expected-error{{illegal initializer}}
+    f_type f_cast_b = (f_type)(f); // expected-error{{address of overloaded function}}
+  }
 }
