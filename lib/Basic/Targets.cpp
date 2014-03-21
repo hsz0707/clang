@@ -5460,7 +5460,7 @@ public:
     if (getTriple().getArch() == llvm::Triple::le32) {
       return TargetInfo::CharPtrBuiltinVaList;
     } else {
-      return TargetInfo::AArch64ABIBuiltinVaList;
+      return TargetInfo::NDK64ABIBuiltinVaList;
     }
   }
 
