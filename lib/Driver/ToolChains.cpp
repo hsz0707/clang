@@ -1157,7 +1157,8 @@ void Generic_GCC::GCCInstallationDetector::print(raw_ostream &OS) const {
   // lifetime or initialization issues.
   static const char *const AArch64LibDirs[] = { "/lib" };
   static const char *const AArch64Triples[] = { "aarch64-none-linux-gnu",
-                                                "aarch64-linux-gnu" };
+                                                "aarch64-linux-gnu",
+                                                "aarch64-linux-android" };
 
   static const char *const ARMLibDirs[] = { "/lib" };
   static const char *const ARMTriples[] = { "arm-linux-gnueabi",
