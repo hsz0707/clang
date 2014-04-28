@@ -2261,6 +2261,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     switch (getToolChain().getTriple().getArch()) {
     case llvm::Triple::arm:
     case llvm::Triple::thumb:
+    case llvm::Triple::aarch64:
     case llvm::Triple::mips:
     case llvm::Triple::mipsel:
     case llvm::Triple::mips64:
