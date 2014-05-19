@@ -6572,7 +6572,10 @@ void gnutools::Link::ConstructJob(Compilation &C, const JobAction &JA,
   const SanitizerArgs &Sanitize = ToolChain.getSanitizerArgs();
   const bool IsPIE =
     !Args.hasArg(options::OPT_shared) &&
-    (Args.hasArg(options::OPT_pie) || Sanitize.hasZeroBaseShadow());
+    !Args.hasArg(options::OPT_static) &&
+    (Args.hasArg(options::OPT_pie) || Sanitize.hasZeroBaseShadow() ||
+     // On Android every code is PIC so every executable is PIE
+     isAndroid);
 
   ArgStringList CmdArgs;
 
