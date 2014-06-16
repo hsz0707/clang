@@ -6569,13 +6569,24 @@ void gnutools::Link::ConstructJob(Compilation &C, const JobAction &JA,
   const Driver &D = ToolChain.getDriver();
   const bool isAndroid =
     ToolChain.getTriple().getEnvironment() == llvm::Triple::Android;
+  bool has_Wl_shared = false;
+  if (isAndroid && Args.hasArg(options::OPT_Wl_COMMA)) {
+    for (ArgList::const_iterator it = Args.begin(), ie = Args.end(); it != ie; ++it) {
+      const Arg *A = *it;
+      if (A->getOption().matches(options::OPT_Wl_COMMA) &&
+          A->containsValue("-shared")) {
+         has_Wl_shared = true;
+      }
+    }
+   }
+
   const SanitizerArgs &Sanitize = ToolChain.getSanitizerArgs();
   const bool IsPIE =
     !Args.hasArg(options::OPT_shared) &&
     !Args.hasArg(options::OPT_static) &&
     (Args.hasArg(options::OPT_pie) || Sanitize.hasZeroBaseShadow() ||
      // On Android every code is PIC so every executable is PIE
-     isAndroid);
+     (isAndroid && !has_Wl_shared));
 
   ArgStringList CmdArgs;
 
