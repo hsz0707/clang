@@ -1650,6 +1650,36 @@ static void addMultilibFlag(bool Enabled, const char *const Flag,
     Flags.push_back(std::string("-") + Flag);
 }
 
+static bool isARMArch(llvm::Triple::ArchType Arch) {
+  return Arch == llvm::Triple::arm || Arch == llvm::Triple::thumb;
+}
+
+static bool isARMv7a(const ArgList &Args) {
+  if (const Arg *A = Args.getLastArg(options::OPT_march_EQ))
+    return (A->getValue() == StringRef("armv7-a"));
+  return false;
+}
+
+static bool isARMHardFloat(const ArgList &Args) {
+  if (const Arg *A = Args.getLastArg(options::OPT_msoft_float,
+                                     options::OPT_mhard_float,
+                                     options::OPT_mfloat_abi_EQ)) {
+    if (A->getOption().matches(options::OPT_mhard_float)) {
+      return true;
+    } else if (A->getOption().matches(options::OPT_mfloat_abi_EQ) &&
+               A->getValue() == StringRef("hard")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool isThumb(const ArgList &Args) {
+  const Arg *A = Args.getLastArg(options::OPT_mthumb,
+                                 options::OPT_mno_thumb);
+  return A && A->getOption().matches(options::OPT_mthumb);
+}
+
 static bool isMipsArch(llvm::Triple::ArchType Arch) {
   return Arch == llvm::Triple::mips || Arch == llvm::Triple::mipsel ||
          Arch == llvm::Triple::mips64 || Arch == llvm::Triple::mips64el;
@@ -1690,6 +1720,75 @@ struct DetectedMultilibs {
   /// targeting the non-default multilib. Otherwise, it is empty.
   llvm::Optional<Multilib> BiarchSibling;
 };
+
+static bool findBiarchMultilibs(const llvm::Triple &TargetTriple,
+                                StringRef Path, const ArgList &Args,
+                                bool NeedsBiarchSuffix,
+                                DetectedMultilibs &Result);
+
+static bool findARMMultilibs(const llvm::Triple &TargetTriple, StringRef Path,
+                             const llvm::opt::ArgList &Args,
+                             bool NeedsBiarchSuffix,
+                             DetectedMultilibs &Result) {
+  if (TargetTriple.getEnvironment() != llvm::Triple::Android)
+    return findBiarchMultilibs(TargetTriple, Path, Args, NeedsBiarchSuffix,
+                               Result);
+
+  FilterNonExistent NonExistent(Path);
+  MultilibSet AndroidARMMultilibs;
+  {
+    Multilib V7HardFPThumb = Multilib("/armv7-a/thumb/hard")
+      .flag("+march=armv7-a")
+      .flag("+mhard-float")
+      .flag("+mthumb");
+
+    Multilib V7HardFP = Multilib("/armv7-a/hard")
+      .flag("+march=armv7-a")
+      .flag("+mhard-float")
+      .flag("-mthumb");
+
+    Multilib V7Thumb = Multilib("/armv7-a/thumb")
+      .flag("+march=armv7-a")
+      .flag("-mhard-float")
+      .flag("+mthumb");
+
+    Multilib V7 = Multilib("/armv7-a")
+      .flag("+march=armv7-a")
+      .flag("-mhard-float")
+      .flag("-mthumb");
+
+    Multilib Thumb = Multilib("/thumb")
+      .flag("-march=armv7-a")
+      .flag("+mthumb");
+
+    Multilib Default = Multilib("")
+      .flag("-march=armv7-a")
+      .flag("-mthumb");
+
+    std::vector<Multilib> Eithers;
+    Eithers.push_back(V7HardFPThumb);
+    Eithers.push_back(V7HardFP);
+    Eithers.push_back(V7Thumb);
+    Eithers.push_back(V7);
+    Eithers.push_back(Thumb);
+    Eithers.push_back(Default);
+
+    AndroidARMMultilibs = MultilibSet()
+      .Either(Eithers)
+      .FilterOut(NonExistent);
+  }
+
+  Multilib::flags_list Flags;
+  addMultilibFlag(isARMv7a(Args), "march=armv7-a", Flags);
+  addMultilibFlag(isARMHardFloat(Args), "mhard-float", Flags);
+  addMultilibFlag(isThumb(Args), "mthumb", Flags);
+
+  if (AndroidARMMultilibs.select(Flags, Result.SelectedMultilib)) {
+    Result.Multilibs = AndroidARMMultilibs;
+    return true;
+  }
+  return false;
+}
 
 static bool findMIPSMultilibs(const llvm::Triple &TargetTriple, StringRef Path,
                               const llvm::opt::ArgList &Args,
@@ -2124,6 +2223,10 @@ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
       // so handle them there
       if (isMipsArch(TargetArch)) {
         if (!findMIPSMultilibs(TargetTriple, LI->path(), Args, Detected))
+          continue;
+      } else if (isARMArch(TargetArch)) {
+        if (!findARMMultilibs(TargetTriple, LI->path(), Args,
+                              NeedsBiarchSuffix, Detected))
           continue;
       } else if (!findBiarchMultilibs(TargetTriple, LI->path(), Args,
                                       NeedsBiarchSuffix, Detected)) {
