@@ -1239,6 +1239,8 @@ def mfp64 : Flag<["-"], "mfp64">, Group<m_Group>,
 def mfp32 : Flag<["-"], "mfp32">, Group<m_Group>,
   HelpText<"Use 32-bit floating point registers (MIPS only)">;
 def mnan_EQ : Joined<["-"], "mnan=">, Group<m_Group>;
+def mnan_directive: Flag<["-"], "mnan-directive">, Group<m_Group>;
+def mno_nan_directive: Flag<["-"], "mno-nan-directive">, Group<m_Group>;
 def mips1 : Flag<["-"], "mips1">,
   Alias<march_EQ>, AliasArgs<["mips1"]>,
   HelpText<"Equivalent to -march=mips1">, Flags<[HelpHidden]>;
