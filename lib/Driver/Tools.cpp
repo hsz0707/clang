@@ -1227,6 +1227,14 @@ void Clang::AddMIPSTargetArgs(const ArgList &Args,
     }
   }
 
+  if (Arg *A = Args.getLastArg(options::OPT_mnan_directive,
+                               options::OPT_mno_nan_directive)) {
+    if (A->getOption().matches(options::OPT_mno_nan_directive)) {
+      CmdArgs.push_back("-mllvm");
+      CmdArgs.push_back("-mips-no-nan-directive");
+    }
+  }
+
   if (Arg *A = Args.getLastArg(options::OPT_G)) {
     StringRef v = A->getValue();
     CmdArgs.push_back("-mllvm");
