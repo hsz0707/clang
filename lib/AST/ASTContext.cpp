@@ -5872,6 +5872,7 @@ CreateNDK64ABIBuiltinVaListDecl(const ASTContext *Context) {
                                /*Inline*/false, SourceLocation(),
                                SourceLocation(), &Context->Idents.get("std"),
                                /*PrevDecl*/0);
+    NS->setImplicit();
 
     VaListTagDecl = CXXRecordDecl::Create(*Context, TTK_Struct,
                                           Context->getTranslationUnitDecl(),
@@ -5950,6 +5951,7 @@ CreateNDK64ABIBuiltinVaListDecl(const ASTContext *Context) {
                           SourceLocation(), SourceLocation(),
                           &Context->Idents.get("__builtin_va_list"),
                           TInfo);
+  VaListTypedefDecl->setImplicit();
 
   return VaListTypedefDecl;
 }
