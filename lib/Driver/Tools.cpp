@@ -7357,6 +7357,10 @@ void ndktools::Link::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-shared");
   }
 
+  if (Args.hasArg(options::OPT_static)) {
+    CmdArgs.push_back("-static");
+  }
+
   if (!D.SysRoot.empty())
     CmdArgs.push_back(Args.MakeArgString("--sysroot=" + D.SysRoot));
 
