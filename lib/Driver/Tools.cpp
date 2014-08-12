@@ -920,6 +920,9 @@ void mips::getMipsCPUAndABI(const ArgList &Args,
       Triple.getEnvironment() == llvm::Triple::GNU) {
     DefMips32CPU = "mips32r6";
     DefMips64CPU = "mips64r6";
+  } else if (Triple.getEnvironment() == llvm::Triple::Android) {
+    DefMips32CPU = "mips32";
+    DefMips64CPU = "mips64r6";
   }
 
   if (Arg *A = Args.getLastArg(options::OPT_march_EQ,
