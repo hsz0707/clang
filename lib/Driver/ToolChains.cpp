@@ -3263,7 +3263,13 @@ std::string Linux::computeSysRoot() const {
   if (!getDriver().SysRoot.empty())
     return getDriver().SysRoot;
 
-  if (!GCCInstallation.isValid() || !isMipsArch(getTriple().getArch()))
+  // For Android, the sysroot will be either explicitly specified or implicitly
+  // auto-detected in Driver::BuildCompilation.  Thus, we don't have to detect
+  // sysroot in this function.
+  bool IsAndroid = getTriple().getEnvironment() == llvm::Triple::Android;
+
+  if ((!GCCInstallation.isValid()) ||
+      (!isMipsArch(getTriple().getArch()) && !IsAndroid))
     return std::string();
 
   // Standalone MIPS toolchains use different names for sysroot folder
