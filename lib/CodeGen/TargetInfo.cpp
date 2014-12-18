@@ -6139,8 +6139,10 @@ void AMDGPUTargetCodeGenInfo::SetTargetAttributes(
 namespace {
 
 class AndroidABIInfo : public ABIInfo {
+  bool m32bits;
+
 public:
-  AndroidABIInfo(CodeGenTypes &CGT) : ABIInfo(CGT) {}
+  AndroidABIInfo(CodeGenTypes &CGT, bool is32bits) : ABIInfo(CGT), m32bits(is32bits) {}
 
 private:
   ABIArgInfo classifyReturnType(QualType RetTy) const;
@@ -6154,8 +6156,8 @@ private:
 
 class AndroidTargetCodeGenInfo : public TargetCodeGenInfo {
 public:
-  AndroidTargetCodeGenInfo(CodeGenTypes &CGT)
-    : TargetCodeGenInfo(new AndroidABIInfo(CGT)) {}
+  AndroidTargetCodeGenInfo(CodeGenTypes &CGT, bool is32bits)
+    : TargetCodeGenInfo(new AndroidABIInfo(CGT, is32bits)) {}
 };
 
 }  // end anonymous namespace
@@ -6199,8 +6201,21 @@ ABIArgInfo AndroidABIInfo::classifyReturnType(QualType RetTy) const {
   if (RetTy->isVoidType())
     return ABIArgInfo::getIgnore();
 
-  if (isAggregateTypeForABI(RetTy))
-    return ABIArgInfo::getIndirect(0);
+  if (isEmptyRecord(getContext(), RetTy, true))
+    return ABIArgInfo::getIgnore();
+
+  if (isAggregateTypeForABI(RetTy)) {
+    if (m32bits) {
+      return ABIArgInfo::getIndirect(0);
+    } else {
+      uint64_t Size = getContext().getTypeSize(RetTy);
+      if (Size <= 128) {
+        Size = 64 * ((Size + 63) / 64); // round up to multiple of 8 bytes
+        return ABIArgInfo::getDirect(llvm::IntegerType::get(getVMContext(), Size));
+      }
+      return ABIArgInfo::getIndirect(0);
+    }
+  }
 
   // Treat an enum type as its underlying type.
   if (const EnumType *EnumTy = RetTy->getAs<EnumType>())
@@ -6211,10 +6226,15 @@ ABIArgInfo AndroidABIInfo::classifyReturnType(QualType RetTy) const {
 }
 
 void AndroidABIInfo::computeInfo(CGFunctionInfo &FI) const {
+  bool CXXDecide = false;
+  if (!m32bits) {
+    CXXDecide = getCXXABI().classifyReturnType(FI);
+  }
+  if (!CXXDecide)
     FI.getReturnInfo() = classifyReturnType(FI.getReturnType());
-    for (CGFunctionInfo::arg_iterator it = FI.arg_begin(), ie = FI.arg_end();
-         it != ie; ++it)
-      it->info = classifyArgumentType(it->type);
+  for (CGFunctionInfo::arg_iterator it = FI.arg_begin(), ie = FI.arg_end();
+       it != ie; ++it)
+    it->info = classifyArgumentType(it->type);
 }
 
 llvm::Value *AndroidABIInfo::EmitVAArg(llvm::Value *VAListAddr, QualType Ty,
@@ -7181,12 +7201,12 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
 
   case llvm::Triple::le32:
     if (Triple.getOS() == llvm::Triple::NDK)
-      return *(TheTargetCodeGenInfo = new AndroidTargetCodeGenInfo(Types));
+      return *(TheTargetCodeGenInfo = new AndroidTargetCodeGenInfo(Types, true));
     else
       return *(TheTargetCodeGenInfo = new PNaClTargetCodeGenInfo(Types));
   case llvm::Triple::le64:
     if (Triple.getOS() == llvm::Triple::NDK)
-      return *(TheTargetCodeGenInfo = new AndroidTargetCodeGenInfo(Types));
+      return *(TheTargetCodeGenInfo = new AndroidTargetCodeGenInfo(Types, false));
   case llvm::Triple::mips:
   case llvm::Triple::mipsel:
     return *(TheTargetCodeGenInfo = new MIPSTargetCodeGenInfo(Types, true));
