@@ -81,7 +81,6 @@ class LLVM_LIBRARY_VISIBILITY X86TargetInfo : public TargetInfo {
   bool HasSHA = false;
   bool HasMPX = false;
   bool HasSHSTK = false;
-  bool HasIBT = false;
   bool HasSGX = false;
   bool HasCX16 = false;
   bool HasFXSR = false;
@@ -91,6 +90,8 @@ class LLVM_LIBRARY_VISIBILITY X86TargetInfo : public TargetInfo {
   bool HasXSAVES = false;
   bool HasMWAITX = false;
   bool HasCLZERO = false;
+  bool HasCLDEMOTE = false;
+  bool HasPCONFIG = false;
   bool HasPKU = false;
   bool HasCLFLUSHOPT = false;
   bool HasCLWB = false;
@@ -100,9 +101,15 @@ class LLVM_LIBRARY_VISIBILITY X86TargetInfo : public TargetInfo {
   bool HasRetpoline = false;
   bool HasRetpolineExternalThunk = false;
   bool HasLAHFSAHF = false;
+  bool HasWBNOINVD = false;
+  bool HasWAITPKG = false;
+  bool HasMOVDIRI = false;
+  bool HasMOVDIR64B = false;
+  bool HasPTWRITE = false;
+  bool HasINVPCID = false;
 
 protected:
-  /// \brief Enumeration of all of the X86 CPUs supported by Clang.
+  /// Enumeration of all of the X86 CPUs supported by Clang.
   ///
   /// Each enumeration represents a particular CPU supported by Clang. These
   /// loosely correspond to the options passed to '-march' or '-mtune' flags.
@@ -164,10 +171,15 @@ public:
   bool validateInputSize(StringRef Constraint, unsigned Size) const override;
 
   virtual bool
-  checkCFProtectionReturnSupported(DiagnosticsEngine &Diags) const override;
+  checkCFProtectionReturnSupported(DiagnosticsEngine &Diags) const override {
+    return true;
+  };
 
   virtual bool
-  checkCFProtectionBranchSupported(DiagnosticsEngine &Diags) const override;
+  checkCFProtectionBranchSupported(DiagnosticsEngine &Diags) const override {
+    return true;
+  };
+
 
   virtual bool validateOperandSize(StringRef Constraint, unsigned Size) const;
 
@@ -287,6 +299,7 @@ public:
     case CC_X86VectorCall:
     case CC_X86RegCall:
     case CC_C:
+    case CC_PreserveMost:
     case CC_Swift:
     case CC_X86Pascal:
     case CC_IntelOclBicc:
@@ -408,7 +421,6 @@ public:
     LongDoubleWidth = 128;
     LongDoubleAlign = 128;
     SuitableAlign = 128;
-    MaxVectorAlign = 256;
     // The watchOS simulator uses the builtin bool type for Objective-C.
     llvm::Triple T = llvm::Triple(Triple);
     if (T.isWatchOS())
@@ -424,9 +436,6 @@ public:
     if (!DarwinTargetInfo<X86_32TargetInfo>::handleTargetFeatures(Features,
                                                                   Diags))
       return false;
-    // We now know the features we have: we can decide how to align vectors.
-    MaxVectorAlign =
-        hasFeature("avx512f") ? 512 : hasFeature("avx") ? 256 : 128;
     return true;
   }
 };
@@ -789,9 +798,6 @@ public:
     if (!DarwinTargetInfo<X86_64TargetInfo>::handleTargetFeatures(Features,
                                                                   Diags))
       return false;
-    // We now know the features we have: we can decide how to align vectors.
-    MaxVectorAlign =
-        hasFeature("avx512f") ? 512 : hasFeature("avx") ? 256 : 128;
     return true;
   }
 };

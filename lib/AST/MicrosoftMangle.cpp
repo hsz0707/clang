@@ -76,7 +76,7 @@ getLambdaDefaultArgumentDeclContext(const Decl *D) {
   return nullptr;
 }
 
-/// \brief Retrieve the declaration context that should be used when mangling
+/// Retrieve the declaration context that should be used when mangling
 /// the given declaration.
 static const DeclContext *getEffectiveDeclContext(const Decl *D) {
   // The ABI assumes that lambda closure types that occur within
@@ -607,7 +607,7 @@ MicrosoftCXXNameMangler::mangleMemberFunctionPointer(const CXXRecordDecl *RD,
     if (MD->isVirtual()) {
       MicrosoftVTableContext *VTContext =
           cast<MicrosoftVTableContext>(getASTContext().getVTableContext());
-      const MethodVFTableLocation &ML =
+      MethodVFTableLocation ML =
           VTContext->getMethodVFTableLocation(GlobalDecl(MD));
       mangleVirtualMemPtrThunk(MD, ML);
       NVOffset = ML.VFPtrOffset.getQuantity();
@@ -1009,7 +1009,7 @@ void MicrosoftCXXNameMangler::mangleNestedName(const NamedDecl *ND) {
           if (const auto *ND = dyn_cast<NamedDecl>(MC))
             mangleUnqualifiedName(ND);
       // MS ABI and Itanium manglings are in inverted scopes.  In the case of a
-      // RecordDecl, mangle the entire scope hierachy at this point rather than
+      // RecordDecl, mangle the entire scope hierarchy at this point rather than
       // just the unqualified name to get the ordering correct.
       if (const auto *RD = dyn_cast<RecordDecl>(DC))
         mangleName(RD);
@@ -1370,12 +1370,12 @@ void MicrosoftCXXNameMangler::mangleTemplateArg(const TemplateDecl *TD,
     const NamedDecl *ND = TA.getAsDecl();
     if (isa<FieldDecl>(ND) || isa<IndirectFieldDecl>(ND)) {
       mangleMemberDataPointer(
-          cast<CXXRecordDecl>(ND->getDeclContext())->getMostRecentDecl(),
+          cast<CXXRecordDecl>(ND->getDeclContext())->getMostRecentNonInjectedDecl(),
           cast<ValueDecl>(ND));
     } else if (const FunctionDecl *FD = dyn_cast<FunctionDecl>(ND)) {
       const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(FD);
       if (MD && MD->isInstance()) {
-        mangleMemberFunctionPointer(MD->getParent()->getMostRecentDecl(), MD);
+        mangleMemberFunctionPointer(MD->getParent()->getMostRecentNonInjectedDecl(), MD);
       } else {
         Out << "$1?";
         mangleName(FD);
@@ -1919,8 +1919,15 @@ void MicrosoftCXXNameMangler::mangleType(const BuiltinType *T, Qualifiers,
     break;
 
   case BuiltinType::Float16:
-  case BuiltinType::Float128:
-  case BuiltinType::Half: {
+    mangleArtificalTagType(TTK_Struct, "_Float16", {"__clang"});
+    break;
+
+  case BuiltinType::Half:
+    mangleArtificalTagType(TTK_Struct, "_Half", {"__clang"});
+    break;
+
+  case BuiltinType::Char8:
+  case BuiltinType::Float128: {
     DiagnosticsEngine &Diags = Context.getDiags();
     unsigned DiagID = Diags.getCustomDiagID(
         DiagnosticsEngine::Error, "cannot mangle this built-in %0 type yet");
@@ -2184,6 +2191,7 @@ void MicrosoftCXXNameMangler::mangleCallingConvention(CallingConv CC) {
     case CC_X86FastCall: Out << 'I'; break;
     case CC_X86VectorCall: Out << 'Q'; break;
     case CC_Swift: Out << 'S'; break;
+    case CC_PreserveMost: Out << 'U'; break;
     case CC_X86RegCall: Out << 'w'; break;
   }
 }

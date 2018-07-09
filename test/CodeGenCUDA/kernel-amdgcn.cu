@@ -15,6 +15,16 @@ __global__ void kernel(int x) {
   non_kernel();
 }
 
+// CHECK: define amdgpu_kernel void @_Z11EmptyKernelIvEvv
+template <typename T>
+__global__ void EmptyKernel(void) {}
+
+struct Dummy {
+  /// Type definition of the EmptyKernel kernel entry point
+  typedef void (*EmptyKernelPtr)();
+  EmptyKernelPtr Empty() { return EmptyKernel<void>; } 
+};
+
 // CHECK: define amdgpu_kernel void @_Z15template_kernelI1AEvT_
 template<class T>
 __global__ void template_kernel(T x) {}
@@ -22,8 +32,10 @@ __global__ void template_kernel(T x) {}
 void launch(void *f);
 
 int main() {
+  Dummy D;
   launch((void*)A::kernel);
   launch((void*)kernel);
   launch((void*)template_kernel<A>);
+  launch((void*)D.Empty());
   return 0;
 }

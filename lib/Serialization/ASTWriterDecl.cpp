@@ -469,8 +469,8 @@ void ASTDeclWriter::VisitRecordDecl(RecordDecl *D) {
   Record.push_back(D->isNonTrivialToPrimitiveDefaultInitialize());
   Record.push_back(D->isNonTrivialToPrimitiveCopy());
   Record.push_back(D->isNonTrivialToPrimitiveDestroy());
-  Record.push_back(D->canPassInRegisters());
   Record.push_back(D->isParamDestroyedInCallee());
+  Record.push_back(D->getArgPassingRestrictions());
 
   if (D->getDeclContext() == D->getLexicalDeclContext() &&
       !D->hasAttrs() &&
@@ -1635,7 +1635,7 @@ void ASTDeclWriter::VisitStaticAssertDecl(StaticAssertDecl *D) {
   Code = serialization::DECL_STATIC_ASSERT;
 }
 
-/// \brief Emit the DeclContext part of a declaration context decl.
+/// Emit the DeclContext part of a declaration context decl.
 void ASTDeclWriter::VisitDeclContext(DeclContext *DC) {
   Record.AddOffset(Writer.WriteDeclContextLexicalBlock(Context, DC));
   Record.AddOffset(Writer.WriteDeclContextVisibleBlock(Context, DC));
@@ -1913,9 +1913,10 @@ void ASTWriter::WriteDeclAbbrevs() {
   Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 1));
   // isNonTrivialToPrimitiveDestroy
   Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 1));
-  Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 1)); // canPassInRegisters
   // isParamDestroyedInCallee
   Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 1));
+  // getArgPassingRestrictions
+  Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 2));
 
   // DC
   Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::VBR, 6));   // LexicalOffset

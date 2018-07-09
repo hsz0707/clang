@@ -431,10 +431,6 @@ unsigned TargetCodeGenInfo::getOpenCLKernelCallingConv() const {
   return llvm::CallingConv::SPIR_KERNEL;
 }
 
-unsigned TargetCodeGenInfo::getCUDAKernelCallingConv() const {
-  return llvm::CallingConv::C;
-}
-
 llvm::Constant *TargetCodeGenInfo::getNullPointer(const CodeGen::CodeGenModule &CGM,
     llvm::PointerType *T, QualType QT) const {
   return llvm::ConstantPointerNull::get(T);
@@ -753,7 +749,7 @@ public:
       : TargetCodeGenInfo(new WebAssemblyABIInfo(CGT)) {}
 };
 
-/// \brief Classify argument of given type \p Ty.
+/// Classify argument of given type \p Ty.
 ABIArgInfo WebAssemblyABIInfo::classifyArgumentType(QualType Ty) const {
   Ty = useFirstFieldIfTransparentUnion(Ty);
 
@@ -848,7 +844,7 @@ Address PNaClABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
   return EmitVAArgInstr(CGF, VAListAddr, Ty, ABIArgInfo::getDirect());
 }
 
-/// \brief Classify argument of given type \p Ty.
+/// Classify argument of given type \p Ty.
 ABIArgInfo PNaClABIInfo::classifyArgumentType(QualType Ty) const {
   if (isAggregateTypeForABI(Ty)) {
     if (CGCXXABI::RecordArgABI RAA = getRecordArgABI(Ty, getCXXABI()))
@@ -949,7 +945,7 @@ static ABIArgInfo getDirectX86Hva(llvm::Type* T = nullptr) {
 // X86-32 ABI Implementation
 //===----------------------------------------------------------------------===//
 
-/// \brief Similar to llvm::CCState, but for Clang.
+/// Similar to llvm::CCState, but for Clang.
 struct CCState {
   CCState(unsigned CC) : CC(CC), FreeRegs(0), FreeSSERegs(0) {}
 
@@ -1002,14 +998,14 @@ class X86_32ABIInfo : public SwiftABIInfo {
 
   ABIArgInfo getIndirectReturnResult(QualType Ty, CCState &State) const;
 
-  /// \brief Return the alignment to use for the given type on the stack.
+  /// Return the alignment to use for the given type on the stack.
   unsigned getTypeStackAlignInBytes(QualType Ty, unsigned Align) const;
 
   Class classify(QualType Ty) const;
   ABIArgInfo classifyReturnType(QualType RetTy, CCState &State) const;
   ABIArgInfo classifyArgumentType(QualType RetTy, CCState &State) const;
 
-  /// \brief Updates the number of available free registers, returns 
+  /// Updates the number of available free registers, returns 
   /// true if any registers were allocated.
   bool updateFreeRegs(QualType Ty, CCState &State) const;
 
@@ -1019,7 +1015,7 @@ class X86_32ABIInfo : public SwiftABIInfo {
 
   bool canExpandIndirectArgument(QualType Ty) const;
 
-  /// \brief Rewrite the function info so that all memory arguments use
+  /// Rewrite the function info so that all memory arguments use
   /// inalloca.
   void rewriteWithInAlloca(CGFunctionInfo &FI) const;
 
@@ -1945,13 +1941,8 @@ void X86_32TargetCodeGenInfo::setTargetAttributes(
     return;
   if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
     if (FD->hasAttr<X86ForceAlignArgPointerAttr>()) {
-      // Get the LLVM function.
       llvm::Function *Fn = cast<llvm::Function>(GV);
-
-      // Now add the 'alignstack' attribute with a value of 16.
-      llvm::AttrBuilder B;
-      B.addStackAlignmentAttr(16);
-      Fn->addAttributes(llvm::AttributeList::FunctionIndex, B);
+      Fn->addFnAttr("stackrealign");
     }
     if (FD->hasAttr<AnyX86InterruptAttr>()) {
       llvm::Function *Fn = cast<llvm::Function>(GV);
@@ -2303,13 +2294,8 @@ public:
       return;
     if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
       if (FD->hasAttr<X86ForceAlignArgPointerAttr>()) {
-        // Get the LLVM function.
-        auto *Fn = cast<llvm::Function>(GV);
-
-        // Now add the 'alignstack' attribute with a value of 16.
-        llvm::AttrBuilder B;
-        B.addStackAlignmentAttr(16);
-        Fn->addAttributes(llvm::AttributeList::FunctionIndex, B);
+        llvm::Function *Fn = cast<llvm::Function>(GV);
+        Fn->addFnAttr("stackrealign");
       }
       if (FD->hasAttr<AnyX86InterruptAttr>()) {
         llvm::Function *Fn = cast<llvm::Function>(GV);
@@ -2435,13 +2421,8 @@ void WinX86_64TargetCodeGenInfo::setTargetAttributes(
     return;
   if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
     if (FD->hasAttr<X86ForceAlignArgPointerAttr>()) {
-      // Get the LLVM function.
-      auto *Fn = cast<llvm::Function>(GV);
-
-      // Now add the 'alignstack' attribute with a value of 16.
-      llvm::AttrBuilder B;
-      B.addStackAlignmentAttr(16);
-      Fn->addAttributes(llvm::AttributeList::FunctionIndex, B);
+      llvm::Function *Fn = cast<llvm::Function>(GV);
+      Fn->addFnAttr("stackrealign");
     }
     if (FD->hasAttr<AnyX86InterruptAttr>()) {
       llvm::Function *Fn = cast<llvm::Function>(GV);
@@ -4306,7 +4287,7 @@ PPC32TargetCodeGenInfo::initDwarfEHRegSizeTable(CodeGen::CodeGenFunction &CGF,
 
 namespace {
 /// PPC64_SVR4_ABIInfo - The 64-bit PowerPC ELF (SVR4) ABI information.
-class PPC64_SVR4_ABIInfo : public ABIInfo {
+class PPC64_SVR4_ABIInfo : public SwiftABIInfo {
 public:
   enum ABIKind {
     ELFv1 = 0,
@@ -4350,7 +4331,7 @@ private:
 public:
   PPC64_SVR4_ABIInfo(CodeGen::CodeGenTypes &CGT, ABIKind Kind, bool HasQPX,
                      bool SoftFloatABI)
-      : ABIInfo(CGT), Kind(Kind), HasQPX(HasQPX),
+      : SwiftABIInfo(CGT), Kind(Kind), HasQPX(HasQPX),
         IsSoftFloatABI(SoftFloatABI) {}
 
   bool isPromotableTypeForABI(QualType Ty) const;
@@ -4393,6 +4374,15 @@ public:
 
   Address EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
                     QualType Ty) const override;
+
+  bool shouldPassIndirectlyForSwift(ArrayRef<llvm::Type*> scalars,
+                                    bool asReturnValue) const override {
+    return occupiesMoreThan(CGT, scalars, /*total*/ 4);
+  }
+
+  bool isSwiftErrorInRegister() const override {
+    return false;
+  }
 };
 
 class PPC64_SVR4_TargetCodeGenInfo : public TargetCodeGenInfo {
@@ -4560,7 +4550,7 @@ bool ABIInfo::isHomogeneousAggregate(QualType Ty, const Type *&Base,
 
       // For compatibility with GCC, ignore empty bitfields in C++ mode.
       if (getContext().getLangOpts().CPlusPlus &&
-          FD->isBitField() && FD->getBitWidthValue(getContext()) == 0)
+          FD->isZeroLengthBitField(getContext()))
         continue;
 
       uint64_t FldMembers;
@@ -6406,7 +6396,7 @@ QualType SystemZABIInfo::GetSingleElementType(QualType Ty) const {
       // Unlike isSingleElementStruct(), empty structure and array fields
       // do count.  So do anonymous bitfields that aren't zero-sized.
       if (getContext().getLangOpts().CPlusPlus &&
-          FD->isBitField() && FD->getBitWidthValue(getContext()) == 0)
+          FD->isZeroLengthBitField(getContext()))
         continue;
 
       // Unlike isSingleElementStruct(), arrays do not count.
@@ -7639,7 +7629,6 @@ public:
   void setTargetAttributes(const Decl *D, llvm::GlobalValue *GV,
                            CodeGen::CodeGenModule &M) const override;
   unsigned getOpenCLKernelCallingConv() const override;
-  unsigned getCUDAKernelCallingConv() const override;
 
   llvm::Constant *getNullPointer(const CodeGen::CodeGenModule &CGM,
       llvm::PointerType *T, QualType QT) const override;
@@ -7657,6 +7646,7 @@ public:
                             llvm::Function *BlockInvokeFunc,
                             llvm::Value *BlockLiteral) const override;
   bool shouldEmitStaticExternCAliases() const override;
+  void setCUDAKernelCallingConvention(llvm::Function *F) const override;
 };
 }
 
@@ -7727,10 +7717,6 @@ unsigned AMDGPUTargetCodeGenInfo::getOpenCLKernelCallingConv() const {
   return llvm::CallingConv::AMDGPU_KERNEL;
 }
 
-unsigned AMDGPUTargetCodeGenInfo::getCUDAKernelCallingConv() const {
-  return llvm::CallingConv::AMDGPU_KERNEL;
-}
-
 // Currently LLVM assumes null pointers always have value 0,
 // which results in incorrectly transformed IR. Therefore, instead of
 // emitting null pointers in private and local address spaces, a null
@@ -7794,6 +7780,11 @@ AMDGPUTargetCodeGenInfo::getLLVMSyncScopeID(SyncScope S,
 
 bool AMDGPUTargetCodeGenInfo::shouldEmitStaticExternCAliases() const {
   return false;
+}
+
+void AMDGPUTargetCodeGenInfo::setCUDAKernelCallingConvention(
+    llvm::Function *F) const {
+  F->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
 }
 
 //===----------------------------------------------------------------------===//

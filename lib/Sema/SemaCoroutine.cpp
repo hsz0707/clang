@@ -376,7 +376,7 @@ static ExprResult buildMemberCall(Sema &S, Expr *Base, SourceLocation Loc,
 
 // See if return type is coroutine-handle and if so, invoke builtin coro-resume
 // on its address. This is to enable experimental support for coroutine-handle
-// returning await_suspend that results in a guranteed tail call to the target
+// returning await_suspend that results in a guaranteed tail call to the target
 // coroutine.
 static Expr *maybeTailCall(Sema &S, QualType RetType, Expr *E,
                            SourceLocation Loc) {
@@ -510,6 +510,20 @@ VarDecl *Sema::buildCoroutinePromise(SourceLocation Loc) {
   // Build a list of arguments, based on the coroutine functions arguments,
   // that will be passed to the promise type's constructor.
   llvm::SmallVector<Expr *, 4> CtorArgExprs;
+
+  // Add implicit object parameter.
+  if (auto *MD = dyn_cast<CXXMethodDecl>(FD)) {
+    if (MD->isInstance() && !isLambdaCallOperator(MD)) {
+      ExprResult ThisExpr = ActOnCXXThis(Loc);
+      if (ThisExpr.isInvalid())
+        return nullptr;
+      ThisExpr = CreateBuiltinUnaryOp(Loc, UO_Deref, ThisExpr.get());
+      if (ThisExpr.isInvalid())
+        return nullptr;
+      CtorArgExprs.push_back(ThisExpr.get());
+    }
+  }
+
   auto &Moves = ScopeInfo->CoroutineParameterMoves;
   for (auto *PD : FD->parameters()) {
     if (PD->getType()->isDependentType())
@@ -1110,8 +1124,8 @@ bool CoroutineStmtBuilder::makeNewAndDeleteExpr() {
 
     PlacementArgs.push_back(PDRefExpr.get());
   }
-  S.FindAllocationFunctions(Loc, SourceRange(),
-                            /*UseGlobal*/ false, PromiseType,
+  S.FindAllocationFunctions(Loc, SourceRange(), /*NewScope*/ Sema::AFS_Class,
+                            /*DeleteScope*/ Sema::AFS_Both, PromiseType,
                             /*isArray*/ false, PassAlignment, PlacementArgs,
                             OperatorNew, UnusedResult, /*Diagnose*/ false);
 
@@ -1121,10 +1135,21 @@ bool CoroutineStmtBuilder::makeNewAndDeleteExpr() {
   // an argument of type std::size_t."
   if (!OperatorNew && !PlacementArgs.empty()) {
     PlacementArgs.clear();
-    S.FindAllocationFunctions(Loc, SourceRange(),
-                              /*UseGlobal*/ false, PromiseType,
-                              /*isArray*/ false, PassAlignment,
-                              PlacementArgs, OperatorNew, UnusedResult);
+    S.FindAllocationFunctions(Loc, SourceRange(), /*NewScope*/ Sema::AFS_Class,
+                              /*DeleteScope*/ Sema::AFS_Both, PromiseType,
+                              /*isArray*/ false, PassAlignment, PlacementArgs,
+                              OperatorNew, UnusedResult, /*Diagnose*/ false);
+  }
+
+  // [dcl.fct.def.coroutine]/7
+  // "The allocation function’s name is looked up in the scope of P. If this
+  // lookup fails, the allocation function’s name is looked up in the global
+  // scope."
+  if (!OperatorNew) {
+    S.FindAllocationFunctions(Loc, SourceRange(), /*NewScope*/ Sema::AFS_Global,
+                              /*DeleteScope*/ Sema::AFS_Both, PromiseType,
+                              /*isArray*/ false, PassAlignment, PlacementArgs,
+                              OperatorNew, UnusedResult);
   }
 
   bool IsGlobalOverload =
@@ -1138,8 +1163,8 @@ bool CoroutineStmtBuilder::makeNewAndDeleteExpr() {
       return false;
     PlacementArgs = {StdNoThrow};
     OperatorNew = nullptr;
-    S.FindAllocationFunctions(Loc, SourceRange(),
-                              /*UseGlobal*/ true, PromiseType,
+    S.FindAllocationFunctions(Loc, SourceRange(), /*NewScope*/ Sema::AFS_Both,
+                              /*DeleteScope*/ Sema::AFS_Both, PromiseType,
                               /*isArray*/ false, PassAlignment, PlacementArgs,
                               OperatorNew, UnusedResult);
   }
@@ -1149,7 +1174,7 @@ bool CoroutineStmtBuilder::makeNewAndDeleteExpr() {
 
   if (RequiresNoThrowAlloc) {
     const auto *FT = OperatorNew->getType()->getAs<FunctionProtoType>();
-    if (!FT->isNothrow(S.Context, /*ResultIfDependent*/ false)) {
+    if (!FT->isNothrow(/*ResultIfDependent*/ false)) {
       S.Diag(OperatorNew->getLocation(),
              diag::err_coroutine_promise_new_requires_nothrow)
           << OperatorNew;
@@ -1427,7 +1452,7 @@ static Expr *castForMoving(Sema &S, Expr *E, QualType T = QualType()) {
       .get();
 }
 
-/// \brief Build a variable declaration for move parameter.
+/// Build a variable declaration for move parameter.
 static VarDecl *buildVarDecl(Sema &S, SourceLocation Loc, QualType Type,
                              IdentifierInfo *II) {
   TypeSourceInfo *TInfo = S.Context.getTrivialTypeSourceInfo(Type, Loc);

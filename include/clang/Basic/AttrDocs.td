@@ -2740,6 +2740,28 @@ The syntax of the declare target directive is as follows:
   }];
 }
 
+def NoStackProtectorDocs : Documentation {
+  let Category = DocCatFunction;
+  let Content = [{
+Clang supports the ``__attribute__((no_stack_protector))`` attribute which disables
+the stack protector on the specified function. This attribute is useful for
+selectively disabling the stack protector on some functions when building with
+``-fstack-protector`` compiler option.
+
+For example, it disables the stack protector for the function ``foo`` but function
+``bar`` will still be built with the stack protector with the ``-fstack-protector``
+option.
+
+.. code-block:: c
+
+    int __attribute__((no_stack_protector))
+    foo (int x); // stack protection will be disabled for foo.
+
+    int bar(int y); // bar can be built with the stack protector.
+
+    }];
+}
+
 def NotTailCalledDocs : Documentation {
   let Category = DocCatFunction;
   let Content = [{
@@ -2798,7 +2820,7 @@ def NoThrowDocs : Documentation {
   let Category = DocCatFunction;
   let Content = [{
 Clang supports the GNU style ``__attribute__((nothrow))`` and Microsoft style
-``__declspec(nothrow)`` attribute as an equivilent of `noexcept` on function
+``__declspec(nothrow)`` attribute as an equivalent of `noexcept` on function
 declarations. This attribute informs the compiler that the annotated function
 does not throw an exception. This prevents exception-unwinding. This attribute
 is particularly useful on functions in the C Standard Library that are
@@ -3110,7 +3132,7 @@ the ability to distinguish between different versions of the same entity but
 with different ABI versions supported. For example, a newer version of a class
 could have a different set of data members and thus have a different size. Using
 the ``abi_tag`` attribute, it is possible to have different mangled names for
-a global variable of the class type. Therefor, the old code could keep using
+a global variable of the class type. Therefore, the old code could keep using
 the old manged name and the new code will use the new mangled name with tags.
   }];
 }

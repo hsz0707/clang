@@ -2223,6 +2223,7 @@ ItaniumVTableContext::ItaniumVTableContext(ASTContext &Context)
 ItaniumVTableContext::~ItaniumVTableContext() {}
 
 uint64_t ItaniumVTableContext::getMethodVTableIndex(GlobalDecl GD) {
+  GD = GD.getCanonicalDecl();
   MethodVTableIndicesTy::iterator I = MethodVTableIndices.find(GD);
   if (I != MethodVTableIndices.end())
     return I->second;
@@ -2396,7 +2397,7 @@ private:
 
   MethodVFTableLocationsTy MethodVFTableLocations;
 
-  /// \brief Does this class have an RTTI component?
+  /// Does this class have an RTTI component?
   bool HasRTTIComponent = false;
 
   /// MethodInfo - Contains information about a method in a vtable.
@@ -2503,6 +2504,8 @@ private:
     for (const auto &I : MethodInfoMap) {
       const CXXMethodDecl *MD = I.first;
       const MethodInfo &MI = I.second;
+      assert(MD == MD->getCanonicalDecl());
+
       // Skip the methods that the MostDerivedClass didn't override
       // and the entries shadowed by return adjusting thunks.
       if (MD->getParent() != MostDerivedClass || MI.Shadowed)
@@ -2995,7 +2998,7 @@ void VFTableBuilder::AddMethods(BaseSubobject Base, unsigned BaseDepth,
       }
 
       // In case we need a return adjustment, we'll add a new slot for
-      // the overrider. Mark the overriden method as shadowed by the new slot.
+      // the overrider. Mark the overridden method as shadowed by the new slot.
       OverriddenMethodInfo.Shadowed = true;
 
       // Force a special name mangling for a return-adjusting thunk
@@ -3565,14 +3568,14 @@ void MicrosoftVTableContext::computeVTableRelatedInformation(
   const VTableLayout::AddressPointsMapTy EmptyAddressPointsMap;
 
   {
-    VPtrInfoVector VFPtrs;
-    computeVTablePaths(/*ForVBTables=*/false, RD, VFPtrs);
-    computeFullPathsForVFTables(Context, RD, VFPtrs);
+    auto VFPtrs = llvm::make_unique<VPtrInfoVector>();
+    computeVTablePaths(/*ForVBTables=*/false, RD, *VFPtrs);
+    computeFullPathsForVFTables(Context, RD, *VFPtrs);
     VFPtrLocations[RD] = std::move(VFPtrs);
   }
 
   MethodVFTableLocationsTy NewMethodLocations;
-  for (const std::unique_ptr<VPtrInfo> &VFPtr : VFPtrLocations[RD]) {
+  for (const std::unique_ptr<VPtrInfo> &VFPtr : *VFPtrLocations[RD]) {
     VFTableBuilder Builder(*this, RD, *VFPtr);
 
     VFTableIdTy id(RD, VFPtr->FullOffsetInMDC);
@@ -3717,7 +3720,7 @@ MicrosoftVTableContext::getVFPtrOffsets(const CXXRecordDecl *RD) {
   computeVTableRelatedInformation(RD);
 
   assert(VFPtrLocations.count(RD) && "Couldn't find vfptr locations");
-  return VFPtrLocations[RD];
+  return *VFPtrLocations[RD];
 }
 
 const VTableLayout &
@@ -3730,12 +3733,14 @@ MicrosoftVTableContext::getVFTableLayout(const CXXRecordDecl *RD,
   return *VFTableLayouts[id];
 }
 
-const MethodVFTableLocation &
+MethodVFTableLocation
 MicrosoftVTableContext::getMethodVFTableLocation(GlobalDecl GD) {
   assert(cast<CXXMethodDecl>(GD.getDecl())->isVirtual() &&
          "Only use this method for virtual methods or dtors");
   if (isa<CXXDestructorDecl>(GD.getDecl()))
     assert(GD.getDtorType() == Dtor_Deleting);
+
+  GD = GD.getCanonicalDecl();
 
   MethodVFTableLocationsTy::iterator I = MethodVFTableLocations.find(GD);
   if (I != MethodVFTableLocations.end())
