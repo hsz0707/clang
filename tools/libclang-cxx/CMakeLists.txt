@@ -1,3 +1,7 @@
+set(SOURCES
+  libclang_cxx.cpp
+  )
+
 set(LIBS
   clangBasic
   clangCodeGen
@@ -46,7 +50,7 @@ endif()
 
 add_clang_library(libclang_cxx ${ENABLE_SHARED} ${ENABLE_STATIC}
   OUTPUT_NAME ${output_name}
-
+  ${SOURCES}
   LINK_LIBS
   ${LIBS}
   )
