@@ -194,7 +194,7 @@ void HTMLDiagnostics::ReportDiag(const PathDiagnostic& D,
           FullSourceLoc L(
               SMgr.getExpansionLoc(path.back()->getLocation().asLocation()),
               SMgr);
-          FullSourceLoc FunL(SMgr.getExpansionLoc(Body->getLocStart()), SMgr);
+          FullSourceLoc FunL(SMgr.getExpansionLoc(Body->getBeginLoc()), SMgr);
           offsetDecl = L.getExpansionLineNumber() - FunL.getExpansionLineNumber();
       }
   }
@@ -238,10 +238,8 @@ void HTMLDiagnostics::ReportDiag(const PathDiagnostic& D,
                    << "-" << i << ".html";
           llvm::sys::path::append(Model, Directory,
                                   filename.str());
-          EC = llvm::sys::fs::openFileForWrite(Model,
-                                               FD,
-                                               llvm::sys::fs::F_RW |
-                                               llvm::sys::fs::F_Excl);
+          EC = llvm::sys::fs::openFileForReadWrite(
+              Model, FD, llvm::sys::fs::CD_CreateNew, llvm::sys::fs::OF_None);
           if (EC && EC != llvm::errc::file_exists) {
               llvm::errs() << "warning: could not create file '" << Model
                            << "': " << EC.message() << '\n';

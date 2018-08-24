@@ -114,29 +114,32 @@ EHPersonality::MSVC_CxxFrameHandler3 = { "__CxxFrameHandler3", nullptr };
 const EHPersonality
 EHPersonality::GNU_Wasm_CPlusPlus = { "__gxx_wasm_personality_v0", nullptr };
 
-static const EHPersonality &getCPersonality(const llvm::Triple &T,
+static const EHPersonality &getCPersonality(const TargetInfo &Target,
                                             const LangOptions &L) {
+  const llvm::Triple &T = Target.getTriple();
+  if (T.isWindowsMSVCEnvironment())
+    return EHPersonality::MSVC_CxxFrameHandler3;
   if (L.SjLjExceptions)
     return EHPersonality::GNU_C_SJLJ;
   if (L.DWARFExceptions)
     return EHPersonality::GNU_C;
-  if (T.isWindowsMSVCEnvironment())
-    return EHPersonality::MSVC_CxxFrameHandler3;
   if (L.SEHExceptions)
     return EHPersonality::GNU_C_SEH;
   return EHPersonality::GNU_C;
 }
 
-static const EHPersonality &getObjCPersonality(const llvm::Triple &T,
+static const EHPersonality &getObjCPersonality(const TargetInfo &Target,
                                                const LangOptions &L) {
+  const llvm::Triple &T = Target.getTriple();
+  if (T.isWindowsMSVCEnvironment())
+    return EHPersonality::MSVC_CxxFrameHandler3;
+
   switch (L.ObjCRuntime.getKind()) {
   case ObjCRuntime::FragileMacOSX:
-    return getCPersonality(T, L);
+    return getCPersonality(Target, L);
   case ObjCRuntime::MacOSX:
   case ObjCRuntime::iOS:
   case ObjCRuntime::WatchOS:
-    if (T.isWindowsMSVCEnvironment())
-      return EHPersonality::MSVC_CxxFrameHandler3;
     return EHPersonality::NeXT_ObjC;
   case ObjCRuntime::GNUstep:
     if (L.ObjCRuntime.getVersion() >= VersionTuple(1, 7))
@@ -153,15 +156,15 @@ static const EHPersonality &getObjCPersonality(const llvm::Triple &T,
   llvm_unreachable("bad runtime kind");
 }
 
-static const EHPersonality &getCXXPersonality(const llvm::Triple &T,
-                                              const LangOptions &L,
-                                              const TargetInfo &Target) {
+static const EHPersonality &getCXXPersonality(const TargetInfo &Target,
+                                              const LangOptions &L) {
+  const llvm::Triple &T = Target.getTriple();
+  if (T.isWindowsMSVCEnvironment())
+    return EHPersonality::MSVC_CxxFrameHandler3;
   if (L.SjLjExceptions)
     return EHPersonality::GNU_CPlusPlus_SJLJ;
   if (L.DWARFExceptions)
     return EHPersonality::GNU_CPlusPlus;
-  if (T.isWindowsMSVCEnvironment())
-    return EHPersonality::MSVC_CxxFrameHandler3;
   if (L.SEHExceptions)
     return EHPersonality::GNU_CPlusPlus_SEH;
   // Wasm EH is a non-MVP feature for now.
@@ -174,14 +177,16 @@ static const EHPersonality &getCXXPersonality(const llvm::Triple &T,
 
 /// Determines the personality function to use when both C++
 /// and Objective-C exceptions are being caught.
-static const EHPersonality &getObjCXXPersonality(const llvm::Triple &T,
-                                                 const LangOptions &L,
-                                                 const TargetInfo &Target) {
+static const EHPersonality &getObjCXXPersonality(const TargetInfo &Target,
+                                                 const LangOptions &L) {
+  if (Target.getTriple().isWindowsMSVCEnvironment())
+    return EHPersonality::MSVC_CxxFrameHandler3;
+
   switch (L.ObjCRuntime.getKind()) {
   // In the fragile ABI, just use C++ exception handling and hope
   // they're not doing crazy exception mixing.
   case ObjCRuntime::FragileMacOSX:
-    return getCXXPersonality(T, L, Target);
+    return getCXXPersonality(Target, L);
 
   // The ObjC personality defers to the C++ personality for non-ObjC
   // handlers.  Unlike the C++ case, we use the same personality
@@ -189,7 +194,7 @@ static const EHPersonality &getObjCXXPersonality(const llvm::Triple &T,
   case ObjCRuntime::MacOSX:
   case ObjCRuntime::iOS:
   case ObjCRuntime::WatchOS:
-    return getObjCPersonality(T, L);
+    return getObjCPersonality(Target, L);
 
   case ObjCRuntime::GNUstep:
     return EHPersonality::GNU_ObjCXX;
@@ -198,7 +203,7 @@ static const EHPersonality &getObjCXXPersonality(const llvm::Triple &T,
   // mixed EH.  Use the ObjC personality just to avoid returning null.
   case ObjCRuntime::GCC:
   case ObjCRuntime::ObjFW:
-    return getObjCPersonality(T, L);
+    return getObjCPersonality(Target, L);
   }
   llvm_unreachable("bad runtime kind");
 }
@@ -220,9 +225,10 @@ const EHPersonality &EHPersonality::get(CodeGenModule &CGM,
     return getSEHPersonalityMSVC(T);
 
   if (L.ObjC1)
-    return L.CPlusPlus ? getObjCXXPersonality(T, L, Target)
-                       : getObjCPersonality(T, L);
-  return L.CPlusPlus ? getCXXPersonality(T, L, Target) : getCPersonality(T, L);
+    return L.CPlusPlus ? getObjCXXPersonality(Target, L)
+                       : getObjCPersonality(Target, L);
+  return L.CPlusPlus ? getCXXPersonality(Target, L)
+                     : getCPersonality(Target, L);
 }
 
 const EHPersonality &EHPersonality::get(CodeGenFunction &CGF) {
@@ -318,8 +324,7 @@ void CodeGenModule::SimplifyPersonality() {
     return;
 
   const EHPersonality &ObjCXX = EHPersonality::get(*this, /*FD=*/nullptr);
-  const EHPersonality &CXX =
-      getCXXPersonality(getTarget().getTriple(), LangOpts, getTarget());
+  const EHPersonality &CXX = getCXXPersonality(getTarget(), LangOpts);
   if (&ObjCXX == &CXX)
     return;
 
@@ -330,7 +335,7 @@ void CodeGenModule::SimplifyPersonality() {
 
   // Nothing to do if it's unused.
   if (!Fn || Fn->use_empty()) return;
-  
+
   // Can't do the optimization if it has non-C++ uses.
   if (!PersonalityHasOnlyCXXUses(Fn)) return;
 
@@ -438,7 +443,7 @@ void CodeGenFunction::EmitCXXThrowExpr(const CXXThrowExpr *E,
 void CodeGenFunction::EmitStartEHSpec(const Decl *D) {
   if (!CGM.getLangOpts().CXXExceptions)
     return;
-  
+
   const FunctionDecl* FD = dyn_cast_or_null<FunctionDecl>(D);
   if (!FD) {
     // Check if CapturedDecl is nothrow and create terminate scope for it.
@@ -515,7 +520,7 @@ static void emitFilterDispatchBlock(CodeGenFunction &CGF,
 void CodeGenFunction::EmitEndEHSpec(const Decl *D) {
   if (!CGM.getLangOpts().CXXExceptions)
     return;
-  
+
   const FunctionDecl* FD = dyn_cast_or_null<FunctionDecl>(D);
   if (!FD) {
     // Check if CapturedDecl is nothrow and pop terminate scope for it.
@@ -1340,7 +1345,7 @@ namespace {
         CGF.PopCleanupBlock();
         CGF.Builder.restoreIP(SavedIP);
       }
-    
+
       // Now make sure we actually have an insertion point or the
       // cleanup gods will hate us.
       CGF.EnsureInsertPoint();
@@ -1818,7 +1823,7 @@ void CodeGenFunction::EmitCapturedLocals(CodeGenFunction &ParentCGF,
 void CodeGenFunction::startOutlinedSEHHelper(CodeGenFunction &ParentCGF,
                                              bool IsFilter,
                                              const Stmt *OutlinedStmt) {
-  SourceLocation StartLoc = OutlinedStmt->getLocStart();
+  SourceLocation StartLoc = OutlinedStmt->getBeginLoc();
 
   // Get the mangled function name.
   SmallString<128> Name;
@@ -1866,7 +1871,7 @@ void CodeGenFunction::startOutlinedSEHHelper(CodeGenFunction &ParentCGF,
   IsOutlinedSEHHelper = true;
 
   StartFunction(GlobalDecl(), RetTy, Fn, FnInfo, Args,
-                OutlinedStmt->getLocStart(), OutlinedStmt->getLocStart());
+                OutlinedStmt->getBeginLoc(), OutlinedStmt->getBeginLoc());
   CurSEHParent = ParentCGF.CurSEHParent;
 
   CGM.SetLLVMFunctionAttributes(nullptr, FnInfo, CurFn);
@@ -1888,7 +1893,7 @@ CodeGenFunction::GenerateSEHFilterFunction(CodeGenFunction &ParentCGF,
                             FilterExpr->getType()->isSignedIntegerType());
   Builder.CreateStore(R, ReturnValue);
 
-  FinishFunction(FilterExpr->getLocEnd());
+  FinishFunction(FilterExpr->getEndLoc());
 
   return CurFn;
 }
@@ -1902,7 +1907,7 @@ CodeGenFunction::GenerateSEHFinallyFunction(CodeGenFunction &ParentCGF,
   // Emit the original filter expression, convert to i32, and return.
   EmitStmt(FinallyBlock);
 
-  FinishFunction(FinallyBlock->getLocEnd());
+  FinishFunction(FinallyBlock->getEndLoc());
 
   return CurFn;
 }

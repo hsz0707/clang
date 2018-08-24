@@ -109,9 +109,7 @@ class FactSet;
 /// along with additional information, such as where it was acquired, whether
 /// it is exclusive or shared, etc.
 ///
-/// FIXME: this analysis does not currently support either re-entrant
-/// locking or lock "upgrading" and "downgrading" between exclusive and
-/// shared.
+/// FIXME: this analysis does not currently support re-entrant locking.
 class FactEntry : public CapabilityExpr {
 private:
   /// Exclusive or shared.
@@ -821,13 +819,13 @@ static void findBlockLocations(CFG *CFGraph,
     // Find the source location of the last statement in the block, if the
     // block is not empty.
     if (const Stmt *S = CurrBlock->getTerminator()) {
-      CurrBlockInfo->EntryLoc = CurrBlockInfo->ExitLoc = S->getLocStart();
+      CurrBlockInfo->EntryLoc = CurrBlockInfo->ExitLoc = S->getBeginLoc();
     } else {
       for (CFGBlock::const_reverse_iterator BI = CurrBlock->rbegin(),
            BE = CurrBlock->rend(); BI != BE; ++BI) {
         // FIXME: Handle other CFGElement kinds.
         if (Optional<CFGStmt> CS = BI->getAs<CFGStmt>()) {
-          CurrBlockInfo->ExitLoc = CS->getStmt()->getLocStart();
+          CurrBlockInfo->ExitLoc = CS->getStmt()->getBeginLoc();
           break;
         }
       }
@@ -839,7 +837,7 @@ static void findBlockLocations(CFG *CFGraph,
       for (const auto &BI : *CurrBlock) {
         // FIXME: Handle other CFGElement kinds.
         if (Optional<CFGStmt> CS = BI.getAs<CFGStmt>()) {
-          CurrBlockInfo->EntryLoc = CS->getStmt()->getLocStart();
+          CurrBlockInfo->EntryLoc = CS->getStmt()->getBeginLoc();
           break;
         }
       }
@@ -1737,8 +1735,7 @@ void BuildLockset::handleCall(Expr *Exp, const NamedDecl *D, VarDecl *VD) {
     }
   }
 
-  for(Attr *Atconst : D->attrs()) {
-    auto *At = const_cast<Attr *>(Atconst);
+  for(const Attr *At : D->attrs()) {
     switch (At->getKind()) {
       // When we encounter a lock function, we need to add the lock to our
       // lockset.
@@ -1838,6 +1835,16 @@ void BuildLockset::handleCall(Expr *Exp, const NamedDecl *D, VarDecl *VD) {
     }
   }
 
+  // Remove locks first to allow lock upgrading/downgrading.
+  // FIXME -- should only fully remove if the attribute refers to 'this'.
+  bool Dtor = isa<CXXDestructorDecl>(D);
+  for (const auto &M : ExclusiveLocksToRemove)
+    Analyzer->removeLock(FSet, M, Loc, Dtor, LK_Exclusive, CapDiagKind);
+  for (const auto &M : SharedLocksToRemove)
+    Analyzer->removeLock(FSet, M, Loc, Dtor, LK_Shared, CapDiagKind);
+  for (const auto &M : GenericLocksToRemove)
+    Analyzer->removeLock(FSet, M, Loc, Dtor, LK_Generic, CapDiagKind);
+
   // Add locks.
   for (const auto &M : ExclusiveLocksToAdd)
     Analyzer->addLock(FSet, llvm::make_unique<LockableFactEntry>(
@@ -1864,16 +1871,6 @@ void BuildLockset::handleCall(Expr *Exp, const NamedDecl *D, VarDecl *VD) {
                           Scp, MLoc, ExclusiveLocksToAdd, SharedLocksToAdd),
                       CapDiagKind);
   }
-
-  // Remove locks.
-  // FIXME -- should only fully remove if the attribute refers to 'this'.
-  bool Dtor = isa<CXXDestructorDecl>(D);
-  for (const auto &M : ExclusiveLocksToRemove)
-    Analyzer->removeLock(FSet, M, Loc, Dtor, LK_Exclusive, CapDiagKind);
-  for (const auto &M : SharedLocksToRemove)
-    Analyzer->removeLock(FSet, M, Loc, Dtor, LK_Shared, CapDiagKind);
-  for (const auto &M : GenericLocksToRemove)
-    Analyzer->removeLock(FSet, M, Loc, Dtor, LK_Generic, CapDiagKind);
 }
 
 /// For unary operations which read and write a variable, we need to
@@ -2083,7 +2080,7 @@ void BuildLockset::VisitDeclStmt(DeclStmt *S) {
         CXXConstructorDecl *CtorD = findConstructorForByValueReturn(RD);
         if (!CtorD || !CtorD->hasAttrs())
           continue;
-        handleCall(buildFakeCtorCall(CtorD, {E}, E->getLocStart()), CtorD, VD);
+        handleCall(buildFakeCtorCall(CtorD, {E}, E->getBeginLoc()), CtorD, VD);
       }
     }
   }
@@ -2245,8 +2242,8 @@ void ThreadSafetyAnalyzer::runAnalysis(AnalysisDeclContext &AC) {
         // We must ignore such methods.
         if (A->args_size() == 0)
           return;
-        // FIXME -- deal with exclusive vs. shared unlock functions?
-        getMutexIDs(ExclusiveLocksToAdd, A, nullptr, D);
+        getMutexIDs(A->isShared() ? SharedLocksToAdd : ExclusiveLocksToAdd, A,
+                    nullptr, D);
         getMutexIDs(LocksReleased, A, nullptr, D);
         CapDiagKind = ClassifyDiagnostic(A);
       } else if (const auto *A = dyn_cast<AcquireCapabilityAttr>(Attr)) {
@@ -2399,7 +2396,7 @@ void ThreadSafetyAnalyzer::runAnalysis(AnalysisDeclContext &AC) {
           // Create a dummy expression,
           auto *VD = const_cast<VarDecl *>(AD.getVarDecl());
           DeclRefExpr DRE(VD, false, VD->getType().getNonReferenceType(),
-                          VK_LValue, AD.getTriggerStmt()->getLocEnd());
+                          VK_LValue, AD.getTriggerStmt()->getEndLoc());
           LocksetBuilder.handleCall(&DRE, DD);
           break;
         }

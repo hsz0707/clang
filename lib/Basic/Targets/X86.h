@@ -132,7 +132,7 @@ public:
       : TargetInfo(Triple) {
     LongDoubleFormat = &llvm::APFloat::x87DoubleExtended();
   }
-  
+
   unsigned getFloatEvalMethod() const override {
     // X87 evaluates with 80 bits "long double" precision.
     return SSELevel == NoSSE ? 2 : 0;
@@ -149,6 +149,14 @@ public:
   bool validateCpuSupports(StringRef Name) const override;
 
   bool validateCpuIs(StringRef Name) const override;
+
+  bool validateCPUSpecificCPUDispatch(StringRef Name) const override;
+
+  char CPUSpecificManglingCharacter(StringRef Name) const override;
+
+  void getCPUSpecificCPUDispatchFeatures(
+      StringRef Name,
+      llvm::SmallVectorImpl<StringRef> &Features) const override;
 
   bool validateAsmConstraint(const char *&Name,
                              TargetInfo::ConstraintInfo &info) const override;
@@ -230,7 +238,7 @@ public:
 
   void getTargetDefines(const LangOptions &Opts,
                         MacroBuilder &Builder) const override;
-  
+
   static void setSSELevel(llvm::StringMap<bool> &Features, X86SSEEnum Level,
                           bool Enabled);
 
@@ -421,6 +429,7 @@ public:
     LongDoubleWidth = 128;
     LongDoubleAlign = 128;
     SuitableAlign = 128;
+    MaxVectorAlign = 256;
     // The watchOS simulator uses the builtin bool type for Objective-C.
     llvm::Triple T = llvm::Triple(Triple);
     if (T.isWatchOS())
@@ -436,6 +445,9 @@ public:
     if (!DarwinTargetInfo<X86_32TargetInfo>::handleTargetFeatures(Features,
                                                                   Diags))
       return false;
+    // We now know the features we have: we can decide how to align vectors.
+    MaxVectorAlign =
+        hasFeature("avx512f") ? 512 : hasFeature("avx") ? 256 : 128;
     return true;
   }
 };
@@ -565,7 +577,7 @@ public:
     IntPtrType = SignedLong;
     PtrDiffType = SignedLong;
   }
-  
+
   void getTargetDefines(const LangOptions &Opts,
                         MacroBuilder &Builder) const override {
     X86_32TargetInfo::getTargetDefines(Opts, Builder);
@@ -652,7 +664,7 @@ public:
   bool hasInt128Type() const override { return true; }
 
   unsigned getUnwindWordWidth() const override { return 64; }
-  
+
   unsigned getRegisterWidth() const override { return 64; }
 
   bool validateGlobalRegisterVariable(StringRef RegName, unsigned RegSize,
@@ -740,7 +752,7 @@ public:
 
   TargetInfo::CallingConvKind
   getCallingConvKind(bool ClangABICompat4) const override {
-    return CCK_MicrosoftX86_64;
+    return CCK_MicrosoftWin64;
   }
 };
 
@@ -798,6 +810,9 @@ public:
     if (!DarwinTargetInfo<X86_64TargetInfo>::handleTargetFeatures(Features,
                                                                   Diags))
       return false;
+    // We now know the features we have: we can decide how to align vectors.
+    MaxVectorAlign =
+        hasFeature("avx512f") ? 512 : hasFeature("avx") ? 256 : 128;
     return true;
   }
 };
