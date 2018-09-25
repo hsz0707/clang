@@ -30,6 +30,10 @@ if (DL_LIBRARY_PATH)
   list(APPEND LIBS dl)
 endif()
 
+if(NOT WIN32)
+  set(LLVM_EXPORTED_SYMBOL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/libclang_cxx.exports)
+endif()
+
 if( LLVM_ENABLE_PIC )
   set(ENABLE_SHARED SHARED)
 endif()
