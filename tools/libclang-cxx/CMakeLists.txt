@@ -8,6 +8,8 @@ set(LIBS
   clangDriver
   clangFrontend
   clangFrontendTool
+  clangIndex
+  clangTooling
 )
 
 if (CLANG_ENABLE_ARCMT)
