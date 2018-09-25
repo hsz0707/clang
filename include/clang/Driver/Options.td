@@ -2029,6 +2029,10 @@ foreach i = {1-7,18,20} in
   def ffixed_x#i : Flag<["-"], "ffixed-x"#i>, Group<m_aarch64_Features_Group>,
     HelpText<"Reserve the "#i#" register (AArch64 only)">;
 
+foreach i = {8-15,18} in
+  def fcall_saved_x#i : Flag<["-"], "fcall-saved-x"#i>, Group<m_aarch64_Features_Group>,
+    HelpText<"Make the x"#i#" register call-saved (AArch64 only)">;
+
 def msimd128 : Flag<["-"], "msimd128">, Group<m_wasm_Features_Group>;
 def mno_simd128 : Flag<["-"], "mno-simd128">, Group<m_wasm_Features_Group>;
 def mnontrapping_fptoint : Flag<["-"], "mnontrapping-fptoint">, Group<m_wasm_Features_Group>;
