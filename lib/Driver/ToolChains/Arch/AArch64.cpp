@@ -198,59 +198,11 @@ void aarch64::getAArch64TargetFeatures(const Driver &D, const ArgList &Args,
     if (A->getOption().matches(options::OPT_mno_unaligned_access))
       Features.push_back("+strict-align");
 
-  if (Args.hasArg(options::OPT_ffixed_x1))
-    Features.push_back("+reserve-x1");
-
-  if (Args.hasArg(options::OPT_ffixed_x2))
-    Features.push_back("+reserve-x2");
-
-  if (Args.hasArg(options::OPT_ffixed_x3))
-    Features.push_back("+reserve-x3");
-
-  if (Args.hasArg(options::OPT_ffixed_x4))
-    Features.push_back("+reserve-x4");
-
-  if (Args.hasArg(options::OPT_ffixed_x5))
-    Features.push_back("+reserve-x5");
-
-  if (Args.hasArg(options::OPT_ffixed_x6))
-    Features.push_back("+reserve-x6");
-
-  if (Args.hasArg(options::OPT_ffixed_x7))
-    Features.push_back("+reserve-x7");
-
   if (Args.hasArg(options::OPT_ffixed_x18))
     Features.push_back("+reserve-x18");
 
   if (Args.hasArg(options::OPT_ffixed_x20))
     Features.push_back("+reserve-x20");
-
-  if (Args.hasArg(options::OPT_fcall_saved_x8))
-    Features.push_back("+call-saved-x8");
-
-  if (Args.hasArg(options::OPT_fcall_saved_x9))
-    Features.push_back("+call-saved-x9");
-
-  if (Args.hasArg(options::OPT_fcall_saved_x10))
-    Features.push_back("+call-saved-x10");
-
-  if (Args.hasArg(options::OPT_fcall_saved_x11))
-    Features.push_back("+call-saved-x11");
-
-  if (Args.hasArg(options::OPT_fcall_saved_x12))
-    Features.push_back("+call-saved-x12");
-
-  if (Args.hasArg(options::OPT_fcall_saved_x13))
-    Features.push_back("+call-saved-x13");
-
-  if (Args.hasArg(options::OPT_fcall_saved_x14))
-    Features.push_back("+call-saved-x14");
-
-  if (Args.hasArg(options::OPT_fcall_saved_x15))
-    Features.push_back("+call-saved-x15");
-
-  if (Args.hasArg(options::OPT_fcall_saved_x18))
-    Features.push_back("+call-saved-x18");
 
   if (Args.hasArg(options::OPT_mno_neg_immediates))
     Features.push_back("+no-neg-immediates");
