@@ -1509,6 +1509,23 @@ void CodeGenFunction::EmitOMPPrivateLoopCounters(
     }
     ++I;
   }
+  // Privatize extra loop counters used in loops for ordered(n) clauses.
+  for (const auto *C : S.getClausesOfKind<OMPOrderedClause>()) {
+    if (!C->getNumForLoops())
+      continue;
+    for (unsigned I = S.getCollapsedNumber(),
+                  E = C->getLoopNumIterations().size();
+         I < E; ++I) {
+      const auto *DRE = cast<DeclRefExpr>(C->getLoopCounter(I));
+      const auto *VD = cast<VarDecl>(DRE->getDecl());
+      // Override only those variables that are really emitted already.
+      if (LocalDeclMap.count(VD)) {
+        (void)LoopScope.addPrivate(VD, [this, DRE, VD]() {
+          return CreateMemTemp(DRE->getType(), VD->getName());
+        });
+      }
+    }
+  }
 }
 
 static void emitPreCond(CodeGenFunction &CGF, const OMPLoopDirective &S,
@@ -2244,7 +2261,7 @@ bool CodeGenFunction::EmitOMPWorksharingLoop(
     bool Ordered = false;
     if (const auto *OrderedClause = S.getSingleClause<OMPOrderedClause>()) {
       if (OrderedClause->getNumForLoops())
-        RT.emitDoacrossInit(*this, S);
+        RT.emitDoacrossInit(*this, S, OrderedClause->getLoopNumIterations());
       else
         Ordered = true;
     }
@@ -2293,6 +2310,10 @@ bool CodeGenFunction::EmitOMPWorksharingLoop(
                                        S.getIterationVariable()->getType(),
                                        S.getBeginLoc());
         }
+      } else {
+        // Default behaviour for schedule clause.
+        CGM.getOpenMPRuntime().getDefaultScheduleAndChunk(
+            *this, S, ScheduleKind.Schedule, Chunk);
       }
       const unsigned IVSize = getContext().getTypeSize(IVExpr->getType());
       const bool IVSigned = IVExpr->getType()->hasSignedIntegerRepresentation();
@@ -3308,6 +3329,10 @@ void CodeGenFunction::EmitOMPDistributeLoop(const OMPLoopDirective &S,
                                        S.getIterationVariable()->getType(),
                                        S.getBeginLoc());
         }
+      } else {
+        // Default behaviour for dist_schedule clause.
+        CGM.getOpenMPRuntime().getDefaultDistScheduleAndChunk(
+            *this, S, ScheduleKind, Chunk);
       }
       const unsigned IVSize = getContext().getTypeSize(IVExpr->getType());
       const bool IVSigned = IVExpr->getType()->hasSignedIntegerRepresentation();
@@ -3375,20 +3400,7 @@ void CodeGenFunction::EmitOMPDistributeLoop(const OMPLoopDirective &S,
       if (isOpenMPSimdDirective(S.getDirectiveKind()) &&
           !isOpenMPParallelDirective(S.getDirectiveKind()) &&
           !isOpenMPTeamsDirective(S.getDirectiveKind())) {
-        OpenMPDirectiveKind ReductionKind = OMPD_unknown;
-        if (isOpenMPParallelDirective(S.getDirectiveKind()) &&
-            isOpenMPSimdDirective(S.getDirectiveKind())) {
-          ReductionKind = OMPD_parallel_for_simd;
-        } else if (isOpenMPParallelDirective(S.getDirectiveKind())) {
-          ReductionKind = OMPD_parallel_for;
-        } else if (isOpenMPSimdDirective(S.getDirectiveKind())) {
-          ReductionKind = OMPD_simd;
-        } else if (!isOpenMPTeamsDirective(S.getDirectiveKind()) &&
-                   S.hasClausesOfKind<OMPReductionClause>()) {
-          llvm_unreachable(
-              "No reduction clauses is allowed in distribute directive.");
-        }
-        EmitOMPReductionClauseFinal(S, ReductionKind);
+        EmitOMPReductionClauseFinal(S, OMPD_simd);
         // Emit post-update of the reduction variables if IsLastIter != 0.
         emitPostUpdateForReductionClause(
             *this, S, [IL, &S](CodeGenFunction &CGF) {
@@ -3886,6 +3898,9 @@ static void emitOMPAtomicExpr(CodeGenFunction &CGF, OpenMPClauseKind Kind,
   case OMPC_from:
   case OMPC_use_device_ptr:
   case OMPC_is_device_ptr:
+  case OMPC_unified_address:
+  case OMPC_unified_shared_memory:
+  case OMPC_reverse_offload:
     llvm_unreachable("Clause is not allowed in 'omp atomic'.");
   }
 }
@@ -4940,6 +4955,20 @@ void CodeGenFunction::EmitSimpleOMPExecutableDirective(
             // Emit only those that were not explicitly referenced in clauses.
             if (!CGF.LocalDeclMap.count(VD))
               CGF.EmitVarDecl(*VD);
+          }
+        }
+        for (const auto *C : D.getClausesOfKind<OMPOrderedClause>()) {
+          if (!C->getNumForLoops())
+            continue;
+          for (unsigned I = LD->getCollapsedNumber(),
+                        E = C->getLoopNumIterations().size();
+               I < E; ++I) {
+            if (const auto *VD = dyn_cast<OMPCapturedExprDecl>(
+                    cast<DeclRefExpr>(C->getLoopCounter(I))->getDecl())) {
+              // Emit only those that were not explicitly referenced in clauses.
+              if (!CGF.LocalDeclMap.count(VD))
+                CGF.EmitVarDecl(*VD);
+            }
           }
         }
       }

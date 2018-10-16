@@ -932,14 +932,11 @@ void ASTContext::mergeDefinitionIntoModule(NamedDecl *ND, Module *M,
     if (auto *Listener = getASTMutationListener())
       Listener->RedefinedHiddenDefinition(ND, M);
 
-  if (getLangOpts().ModulesLocalVisibility)
-    MergedDefModules[ND].push_back(M);
-  else
-    ND->setVisibleDespiteOwningModule();
+  MergedDefModules[cast<NamedDecl>(ND->getCanonicalDecl())].push_back(M);
 }
 
 void ASTContext::deduplicateMergedDefinitonsFor(NamedDecl *ND) {
-  auto It = MergedDefModules.find(ND);
+  auto It = MergedDefModules.find(cast<NamedDecl>(ND->getCanonicalDecl()));
   if (It == MergedDefModules.end())
     return;
 
@@ -2298,12 +2295,11 @@ structHasUniqueObjectRepresentations(const ASTContext &Context,
       }
     }
 
-    llvm::sort(
-        Bases.begin(), Bases.end(), [&](const std::pair<QualType, int64_t> &L,
-                                        const std::pair<QualType, int64_t> &R) {
-          return Layout.getBaseClassOffset(L.first->getAsCXXRecordDecl()) <
-                 Layout.getBaseClassOffset(R.first->getAsCXXRecordDecl());
-        });
+    llvm::sort(Bases, [&](const std::pair<QualType, int64_t> &L,
+                          const std::pair<QualType, int64_t> &R) {
+      return Layout.getBaseClassOffset(L.first->getAsCXXRecordDecl()) <
+             Layout.getBaseClassOffset(R.first->getAsCXXRecordDecl());
+    });
 
     for (const auto Base : Bases) {
       int64_t BaseOffset = Context.toBits(
@@ -2503,21 +2499,24 @@ const ObjCInterfaceDecl *ASTContext::getObjContainingInterface(
 
 /// Get the copy initialization expression of VarDecl, or nullptr if
 /// none exists.
-Expr *ASTContext::getBlockVarCopyInits(const VarDecl*VD) {
+ASTContext::BlockVarCopyInit
+ASTContext::getBlockVarCopyInit(const VarDecl*VD) const {
   assert(VD && "Passed null params");
   assert(VD->hasAttr<BlocksAttr>() &&
          "getBlockVarCopyInits - not __block var");
-  llvm::DenseMap<const VarDecl*, Expr*>::iterator
-    I = BlockVarCopyInits.find(VD);
-  return (I != BlockVarCopyInits.end()) ? I->second : nullptr;
+  auto I = BlockVarCopyInits.find(VD);
+  if (I != BlockVarCopyInits.end())
+    return I->second;
+  return {nullptr, false};
 }
 
 /// Set the copy inialization expression of a block var decl.
-void ASTContext::setBlockVarCopyInits(VarDecl*VD, Expr* Init) {
-  assert(VD && Init && "Passed null params");
+void ASTContext::setBlockVarCopyInit(const VarDecl*VD, Expr *CopyExpr,
+                                     bool CanThrow) {
+  assert(VD && CopyExpr && "Passed null params");
   assert(VD->hasAttr<BlocksAttr>() &&
          "setBlockVarCopyInits - not __block var");
-  BlockVarCopyInits[VD] = Init;
+  BlockVarCopyInits[VD].setExprAndFlag(CopyExpr, CanThrow);
 }
 
 TypeSourceInfo *ASTContext::CreateTypeSourceInfo(QualType T,
@@ -3698,30 +3697,19 @@ QualType ASTContext::getFunctionTypeInternal(
     assert(!NewIP && "Shouldn't be in the map!"); (void)NewIP;
   }
 
-  // FunctionProtoType objects are allocated with extra bytes after
-  // them for three variable size arrays at the end:
-  //  - parameter types
-  //  - exception types
-  //  - extended parameter information
-  // Instead of the exception types, there could be a noexcept
-  // expression, or information used to resolve the exception
-  // specification.
-  size_t Size =
-      sizeof(FunctionProtoType) + NumArgs * sizeof(QualType) +
-      FunctionProtoType::getExceptionSpecSize(
-          EPI.ExceptionSpec.Type, EPI.ExceptionSpec.Exceptions.size());
+  // Compute the needed size to hold this FunctionProtoType and the
+  // various trailing objects.
+  auto ESH = FunctionProtoType::getExceptionSpecSize(
+      EPI.ExceptionSpec.Type, EPI.ExceptionSpec.Exceptions.size());
+  size_t Size = FunctionProtoType::totalSizeToAlloc<
+      QualType, FunctionType::FunctionTypeExtraBitfields,
+      FunctionType::ExceptionType, Expr *, FunctionDecl *,
+      FunctionProtoType::ExtParameterInfo>(
+      NumArgs, FunctionProtoType::hasExtraBitfields(EPI.ExceptionSpec.Type),
+      ESH.NumExceptionType, ESH.NumExprPtr, ESH.NumFunctionDeclPtr,
+      EPI.ExtParameterInfos ? NumArgs : 0);
 
-  // Put the ExtParameterInfos last.  If all were equal, it would make
-  // more sense to put these before the exception specification, because
-  // it's much easier to skip past them compared to the elaborate switch
-  // required to skip the exception specification.  However, all is not
-  // equal; ExtParameterInfos are used to model very uncommon features,
-  // and it's better not to burden the more common paths.
-  if (EPI.ExtParameterInfos) {
-    Size += NumArgs * sizeof(FunctionProtoType::ExtParameterInfo);
-  }
-
-  auto *FTP = (FunctionProtoType *) Allocate(Size, TypeAlignment);
+  auto *FTP = (FunctionProtoType *)Allocate(Size, TypeAlignment);
   FunctionProtoType::ExtProtoInfo newEPI = EPI;
   new (FTP) FunctionProtoType(ResultTy, ArgArray, Canonical, newEPI);
   Types.push_back(FTP);
@@ -3873,7 +3861,7 @@ QualType ASTContext::getEnumType(const EnumDecl *Decl) const {
   return QualType(newType, 0);
 }
 
-QualType ASTContext::getAttributedType(AttributedType::Kind attrKind,
+QualType ASTContext::getAttributedType(attr::Kind attrKind,
                                        QualType modifiedType,
                                        QualType equivalentType) {
   llvm::FoldingSetNodeID id;
@@ -4133,8 +4121,10 @@ QualType ASTContext::getElaboratedType(ElaboratedTypeKeyword Keyword,
     (void)CheckT;
   }
 
-  T = new (*this, TypeAlignment)
-      ElaboratedType(Keyword, NNS, NamedType, Canon, OwnedTagDecl);
+  void *Mem = Allocate(ElaboratedType::totalSizeToAlloc<TagDecl *>(!!OwnedTagDecl),
+                       TypeAlignment);
+  T = new (Mem) ElaboratedType(Keyword, NNS, NamedType, Canon, OwnedTagDecl);
+
   Types.push_back(T);
   ElaboratedTypes.InsertNode(T, InsertPos);
   return QualType(T, 0);
@@ -4545,8 +4535,8 @@ ASTContext::getObjCTypeParamType(const ObjCTypeParamDecl *Decl,
     if (!protocols.empty()) {
       // Apply the protocol qualifers.
       bool hasError;
-      Canonical = applyObjCProtocolQualifiers(Canonical, protocols, hasError,
-          true/*allowOnPointerType*/);
+      Canonical = getCanonicalType(applyObjCProtocolQualifiers(
+          Canonical, protocols, hasError, true /*allowOnPointerType*/));
       assert(!hasError && "Error when apply protocol qualifier to bound type");
     }
   }
@@ -5962,7 +5952,7 @@ LangAS ASTContext::getOpenCLTypeAddrSpace(const Type *T) const {
 bool ASTContext::BlockRequiresCopying(QualType Ty,
                                       const VarDecl *D) {
   if (const CXXRecordDecl *record = Ty->getAsCXXRecordDecl()) {
-    const Expr *copyExpr = getBlockVarCopyInits(D);
+    const Expr *copyExpr = getBlockVarCopyInit(D).getCopyExpr();
     if (!copyExpr && record->hasTrivialDestructor()) return false;
 
     return true;
@@ -9722,6 +9712,14 @@ bool ASTContext::DeclMustBeEmitted(const Decl *D) {
         cast<FunctionDecl>(D)->getTemplateSpecializationKind() ==
             TSK_ExplicitInstantiationDefinition;
 
+    // Implicit member function definitions, such as operator= might not be
+    // marked as template specializations, since they're not coming from a
+    // template but synthesized directly on the class.
+    IsExpInstDef |=
+        isa<CXXMethodDecl>(D) &&
+        cast<CXXMethodDecl>(D)->getParent()->getTemplateSpecializationKind() ==
+            TSK_ExplicitInstantiationDefinition;
+
     if (getExternalSource()->DeclIsFromPCHWithObjectFile(D) && !IsExpInstDef)
       return false;
   }
@@ -9771,6 +9769,12 @@ bool ASTContext::DeclMustBeEmitted(const Decl *D) {
   const auto *VD = cast<VarDecl>(D);
   assert(VD->isFileVarDecl() && "Expected file scoped var");
 
+  // If the decl is marked as `declare target to`, it should be emitted for the
+  // host and for the device.
+  if (LangOpts.OpenMP &&
+      OMPDeclareTargetDeclAttr::isDeclareTargetDeclaration(VD))
+    return true;
+
   if (VD->isThisDeclarationADefinition() == VarDecl::DeclarationOnly &&
       !isMSStaticDataMemberInlineDefinition(VD))
     return false;
@@ -9802,21 +9806,12 @@ bool ASTContext::DeclMustBeEmitted(const Decl *D) {
         if (DeclMustBeEmitted(BindingVD))
           return true;
 
-  // If the decl is marked as `declare target`, it should be emitted.
-  for (const auto *Decl : D->redecls()) {
-    if (!Decl->hasAttrs())
-      continue;
-    if (const auto *Attr = Decl->getAttr<OMPDeclareTargetDeclAttr>())
-      if (Attr->getMapType() != OMPDeclareTargetDeclAttr::MT_Link)
-        return true;
-  }
-
   return false;
 }
 
 void ASTContext::forEachMultiversionedFunctionVersion(
     const FunctionDecl *FD,
-    llvm::function_ref<void(const FunctionDecl *)> Pred) const {
+    llvm::function_ref<void(FunctionDecl *)> Pred) const {
   assert(FD->isMultiVersion() && "Only valid for multiversioned functions");
   llvm::SmallDenseSet<const FunctionDecl*, 4> SeenDecls;
   FD = FD->getCanonicalDecl();

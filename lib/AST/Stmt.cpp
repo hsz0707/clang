@@ -113,17 +113,23 @@ void Stmt::EnableStatistics() {
 Stmt *Stmt::IgnoreImplicit() {
   Stmt *s = this;
 
-  if (auto *ewc = dyn_cast<ExprWithCleanups>(s))
-    s = ewc->getSubExpr();
+  Stmt *lasts = nullptr;
 
-  if (auto *mte = dyn_cast<MaterializeTemporaryExpr>(s))
-    s = mte->GetTemporaryExpr();
+  while (s != lasts) {
+    lasts = s;
 
-  if (auto *bte = dyn_cast<CXXBindTemporaryExpr>(s))
-    s = bte->getSubExpr();
+    if (auto *ewc = dyn_cast<ExprWithCleanups>(s))
+      s = ewc->getSubExpr();
 
-  while (auto *ice = dyn_cast<ImplicitCastExpr>(s))
-    s = ice->getSubExpr();
+    if (auto *mte = dyn_cast<MaterializeTemporaryExpr>(s))
+      s = mte->GetTemporaryExpr();
+
+    if (auto *bte = dyn_cast<CXXBindTemporaryExpr>(s))
+      s = bte->getSubExpr();
+
+    if (auto *ice = dyn_cast<ImplicitCastExpr>(s))
+      s = ice->getSubExpr();
+  }
 
   return s;
 }
@@ -294,6 +300,13 @@ SourceLocation Stmt::getEndLoc() const {
 #include "clang/AST/StmtNodes.inc"
   }
   llvm_unreachable("unknown statement kind");
+}
+
+int64_t Stmt::getID(const ASTContext &Context) const {
+  Optional<int64_t> Out = Context.getAllocator().identifyObject(this);
+  assert(Out && "Wrong allocator used");
+  assert(*Out % alignof(Stmt) == 0 && "Wrong alignment information");
+  return *Out / alignof(Stmt);
 }
 
 CompoundStmt::CompoundStmt(ArrayRef<Stmt *> Stmts, SourceLocation LB,

@@ -1105,7 +1105,8 @@ bool Sema::IsOverload(FunctionDecl *New, FunctionDecl *Old,
       (!TemplateParameterListsAreEqual(NewTemplate->getTemplateParameters(),
                                        OldTemplate->getTemplateParameters(),
                                        false, TPL_TemplateMatch) ||
-       OldType->getReturnType() != NewType->getReturnType()))
+       !Context.hasSameType(Old->getDeclaredReturnType(),
+                            New->getDeclaredReturnType())))
     return true;
 
   // If the function is a class member, its signature includes the
@@ -9983,7 +9984,7 @@ static void DiagnoseBadDeduction(Sema &S, NamedDecl *Found, Decl *Templated,
           DeductionFailure.getFirstArg()->getNonTypeTemplateArgumentType();
       QualType T2 =
           DeductionFailure.getSecondArg()->getNonTypeTemplateArgumentType();
-      if (!S.Context.hasSameType(T1, T2)) {
+      if (!T1.isNull() && !T2.isNull() && !S.Context.hasSameType(T1, T2)) {
         S.Diag(Templated->getLocation(),
                diag::note_ovl_candidate_inconsistent_deduction_types)
           << ParamD->getDeclName() << *DeductionFailure.getFirstArg() << T1
@@ -10809,8 +10810,7 @@ void TemplateSpecCandidateSet::NoteCandidates(Sema &S, SourceLocation Loc) {
     // in general, want to list every possible builtin candidate.
   }
 
-  llvm::sort(Cands.begin(), Cands.end(),
-             CompareTemplateSpecCandidatesForDisplay(S));
+  llvm::sort(Cands, CompareTemplateSpecCandidatesForDisplay(S));
 
   // FIXME: Perhaps rename OverloadsShown and getShowOverloads()
   // for generalization purposes (?).

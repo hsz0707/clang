@@ -1,4 +1,4 @@
-// RUN: %clang_analyze_cc1 -x c++ -analyzer-checker=core -analyzer-output=text -verify %s
+// RUN: %clang_analyze_cc1 -x c++ -std=c++14 -analyzer-checker=core -analyzer-output=text -verify %s
 
 int initializer1(int &p, int x) {
   if (x) { // expected-note{{Taking false branch}}
@@ -356,4 +356,19 @@ int forceElementRegionApperence() {
                                // expected-note@-1{{Returning from 'maybeInitializeHasField'}}
   return ((HasFieldB*)&a)->x; // expected-warning{{Undefined or garbage value returned to caller}}
                               // expected-note@-1{{Undefined or garbage value returned to caller}}
+}
+
+////////
+
+struct HasForgottenField {
+  int x;
+  HasForgottenField() {} // expected-note{{Returning without writing to 'this->x'}}
+};
+
+// Test that tracking across exclamation mark works.
+bool tracksThroughExclamationMark() {
+  HasForgottenField a; // expected-note{{Calling default constructor for 'HasForgottenField'}}
+                       // expected-note@-1{{Returning from default constructor for 'HasForgottenField'}}
+  return !a.x; // expected-warning{{Undefined or garbage value returned to caller}}
+               // expected-note@-1{{Undefined or garbage value returned to caller}}
 }

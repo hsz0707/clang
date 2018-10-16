@@ -470,7 +470,7 @@ public:
   /// potentially set the return value.
   bool SawAsmBlock = false;
 
-  const FunctionDecl *CurSEHParent = nullptr;
+  const NamedDecl *CurSEHParent = nullptr;
 
   /// True if the current function is an outlined SEH helper. This can be a
   /// finally block or filter expression.
@@ -1746,6 +1746,9 @@ public:
                                         bool IsLambdaConversionToBlock,
                                         bool BuildGlobalBlock);
 
+  /// Check if \p T is a C++ class that has a destructor that can throw.
+  static bool cxxDestructorCanThrow(QualType T);
+
   llvm::Constant *GenerateCopyHelperFunction(const CGBlockInfo &blockInfo);
   llvm::Constant *GenerateDestroyHelperFunction(const CGBlockInfo &blockInfo);
   llvm::Constant *GenerateObjCAtomicSetterCopyHelperFunction(
@@ -1754,7 +1757,8 @@ public:
                                              const ObjCPropertyImplDecl *PID);
   llvm::Value *EmitBlockCopyAndAutorelease(llvm::Value *Block, QualType Ty);
 
-  void BuildBlockRelease(llvm::Value *DeclPtr, BlockFieldFlags flags);
+  void BuildBlockRelease(llvm::Value *DeclPtr, BlockFieldFlags flags,
+                         bool CanThrow);
 
   class AutoVarEmission;
 
@@ -1777,13 +1781,13 @@ public:
   /// \param LoadBlockVarAddr Indicates whether we need to emit a load from
   /// \p Addr to get the address of the __block structure.
   void enterByrefCleanup(CleanupKind Kind, Address Addr, BlockFieldFlags Flags,
-                         bool LoadBlockVarAddr);
+                         bool LoadBlockVarAddr, bool CanThrow);
 
   void setBlockContextParameter(const ImplicitParamDecl *D, unsigned argNum,
                                 llvm::Value *ptr);
 
   Address LoadBlockStruct();
-  Address GetAddrOfBlockDecl(const VarDecl *var, bool ByRef);
+  Address GetAddrOfBlockDecl(const VarDecl *var);
 
   /// BuildBlockByrefAddress - Computes the location of the
   /// data in a variable which is declared as __block.
@@ -1800,6 +1804,11 @@ public:
 
   void GenerateCode(GlobalDecl GD, llvm::Function *Fn,
                     const CGFunctionInfo &FnInfo);
+
+  /// Annotate the function with an attribute that disables TSan checking at
+  /// runtime.
+  void markAsIgnoreThreadCheckingAtRuntime(llvm::Function *Fn);
+
   /// Emit code for the start of a function.
   /// \param Loc       The location to be associated with the function.
   /// \param StartLoc  The location of the function body.
@@ -2674,8 +2683,9 @@ public:
 
     llvm::Value *NRVOFlag;
 
-    /// True if the variable is a __block variable.
-    bool IsByRef;
+    /// True if the variable is a __block variable that is captured by an
+    /// escaping block.
+    bool IsEscapingByRef;
 
     /// True if the variable is of aggregate type and has a constant
     /// initializer.
@@ -2695,7 +2705,7 @@ public:
 
     AutoVarEmission(const VarDecl &variable)
         : Variable(&variable), Addr(Address::invalid()), NRVOFlag(nullptr),
-          IsByRef(false), IsConstantAggregate(false),
+          IsEscapingByRef(false), IsConstantAggregate(false),
           SizeForLifetimeMarkers(nullptr), AllocaAddr(Address::invalid()) {}
 
     bool wasEmittedAsGlobal() const { return !Addr.isValid(); }
@@ -2725,7 +2735,7 @@ public:
     /// Note that this does not chase the forwarding pointer for
     /// __block decls.
     Address getObjectAddress(CodeGenFunction &CGF) const {
-      if (!IsByRef) return Addr;
+      if (!IsEscapingByRef) return Addr;
 
       return CGF.emitBlockByrefAddress(Addr, Variable, /*forward*/ false);
     }
@@ -2878,6 +2888,8 @@ public:
   void EnterSEHTryStmt(const SEHTryStmt &S);
   void ExitSEHTryStmt(const SEHTryStmt &S);
 
+  void pushSEHCleanup(CleanupKind kind,
+                      llvm::Function *FinallyFunc);
   void startOutlinedSEHHelper(CodeGenFunction &ParentCGF, bool IsFilter,
                               const Stmt *OutlinedStmt);
 
@@ -3603,6 +3615,19 @@ public:
                                                CXXDtorType Type,
                                                const CXXRecordDecl *RD);
 
+  // Return the copy constructor name with the prefix "__copy_constructor_"
+  // removed.
+  static std::string getNonTrivialCopyConstructorStr(QualType QT,
+                                                     CharUnits Alignment,
+                                                     bool IsVolatile,
+                                                     ASTContext &Ctx);
+
+  // Return the destructor name with the prefix "__destructor_" removed.
+  static std::string getNonTrivialDestructorStr(QualType QT,
+                                                CharUnits Alignment,
+                                                bool IsVolatile,
+                                                ASTContext &Ctx);
+
   // These functions emit calls to the special functions of non-trivial C
   // structs.
   void defaultInitNonTrivialCStructVar(LValue Dst);
@@ -3656,6 +3681,8 @@ public:
   RValue EmitBuiltinExpr(const FunctionDecl *FD,
                          unsigned BuiltinID, const CallExpr *E,
                          ReturnValueSlot ReturnValue);
+
+  RValue emitRotate(const CallExpr *E, bool IsRotateRight);
 
   /// Emit IR for __builtin_os_log_format.
   RValue emitBuiltinOSLogFormat(const CallExpr &E);
@@ -4245,30 +4272,26 @@ public:
 
   void EmitSanitizerStatReport(llvm::SanitizerStatKind SSK);
 
-  struct TargetMultiVersionResolverOption {
+  struct MultiVersionResolverOption {
     llvm::Function *Function;
-    TargetAttr::ParsedTargetAttr ParsedAttribute;
-    unsigned Priority;
-    TargetMultiVersionResolverOption(
-        const TargetInfo &TargInfo, llvm::Function *F,
-        const clang::TargetAttr::ParsedTargetAttr &PT)
-        : Function(F), ParsedAttribute(PT), Priority(0u) {
-      for (StringRef Feat : PT.Features)
-        Priority = std::max(Priority,
-                            TargInfo.multiVersionSortPriority(Feat.substr(1)));
+    struct Conds {
+      StringRef Architecture;
+      llvm::SmallVector<StringRef, 8> Features;
 
-      if (!PT.Architecture.empty())
-        Priority = std::max(Priority,
-                            TargInfo.multiVersionSortPriority(PT.Architecture));
-    }
+      Conds(StringRef Arch, ArrayRef<StringRef> Feats)
+          : Architecture(Arch), Features(Feats.begin(), Feats.end()) {}
+    } Conditions;
 
-    bool operator>(const TargetMultiVersionResolverOption &Other) const {
-      return Priority > Other.Priority;
-    }
+    MultiVersionResolverOption(llvm::Function *F, StringRef Arch,
+                               ArrayRef<StringRef> Feats)
+        : Function(F), Conditions(Arch, Feats) {}
   };
-  void EmitTargetMultiVersionResolver(
-      llvm::Function *Resolver,
-      ArrayRef<TargetMultiVersionResolverOption> Options);
+
+  // Emits the body of a multiversion function's resolver. Assumes that the
+  // options are already sorted in the proper order, with the 'default' option
+  // last (if it exists).
+  void EmitMultiVersionResolver(llvm::Function *Resolver,
+                                ArrayRef<MultiVersionResolverOption> Options);
 
   struct CPUDispatchMultiVersionResolverOption {
     llvm::Function *Function;
@@ -4304,8 +4327,7 @@ private:
   llvm::Value *EmitX86CpuSupports(ArrayRef<StringRef> FeatureStrs);
   llvm::Value *EmitX86CpuSupports(uint32_t Mask);
   llvm::Value *EmitX86CpuInit();
-  llvm::Value *
-  FormResolverCondition(const TargetMultiVersionResolverOption &RO);
+  llvm::Value *FormResolverCondition(const MultiVersionResolverOption &RO);
 };
 
 inline DominatingLLVMValue::saved_type

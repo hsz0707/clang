@@ -8,9 +8,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "Hexagon.h"
-#include "InputInfo.h"
 #include "CommonArgs.h"
-#include "clang/Basic/VirtualFileSystem.h"
+#include "InputInfo.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/DriverDiagnostic.h"
@@ -19,6 +18,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace clang::driver;
 using namespace clang::driver::tools;
@@ -513,11 +513,6 @@ unsigned HexagonToolChain::getOptimizationLevel(
 void HexagonToolChain::addClangTargetOptions(const ArgList &DriverArgs,
                                              ArgStringList &CC1Args,
                                              Action::OffloadKind) const {
-  if (!DriverArgs.hasArg(options::OPT_ffp_contract)) {
-    unsigned OptLevel = getOptimizationLevel(DriverArgs);
-    if (OptLevel >= 3)
-      CC1Args.push_back("-ffp-contract=fast");
-  }
   if (DriverArgs.hasArg(options::OPT_ffixed_r19)) {
     CC1Args.push_back("-target-feature");
     CC1Args.push_back("+reserved-r19");

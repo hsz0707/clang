@@ -1262,6 +1262,16 @@ LinkageInfo LinkageComputer::getLVForLocalDecl(const NamedDecl *D,
         !isTemplateInstantiation(FD->getTemplateSpecializationKind()))
       return LinkageInfo::none();
 
+    // If a function is hidden by -fvisibility-inlines-hidden option and
+    // is not explicitly attributed as a hidden function,
+    // we should not make static local variables in the function hidden.
+    if (isa<VarDecl>(D) && useInlineVisibilityHidden(FD) &&
+        !(!hasExplicitVisibilityAlready(computation) &&
+          getExplicitVisibility(FD, computation))) {
+      assert(cast<VarDecl>(D)->isStaticLocal());
+      return LinkageInfo(VisibleNoLinkage, DefaultVisibility, false);
+    }
+
     LV = getLVForDecl(FD, computation);
   }
   if (!isExternallyVisible(LV.getLinkage()))
@@ -2351,6 +2361,14 @@ static DeclT *getDefinitionOrSelf(DeclT *D) {
   return D;
 }
 
+bool VarDecl::isEscapingByref() const {
+  return hasAttr<BlocksAttr>() && NonParmVarDeclBits.EscapingByref;
+}
+
+bool VarDecl::isNonEscapingByref() const {
+  return hasAttr<BlocksAttr>() && !NonParmVarDeclBits.EscapingByref;
+}
+
 VarDecl *VarDecl::getTemplateInstantiationPattern() const {
   // If it's a variable template specialization, find the template or partial
   // specialization from which it was instantiated.
@@ -2441,12 +2459,18 @@ bool VarDecl::isKnownToBeDefined() const {
   //
   // With CUDA relocatable device code enabled, these variables don't get
   // special handling; they're treated like regular extern variables.
-  if (LangOpts.CUDA && !LangOpts.CUDARelocatableDeviceCode &&
+  if (LangOpts.CUDA && !LangOpts.GPURelocatableDeviceCode &&
       hasExternalStorage() && hasAttr<CUDASharedAttr>() &&
       isa<IncompleteArrayType>(getType()))
     return true;
 
   return hasDefinition();
+}
+
+bool VarDecl::isNoDestroy(const ASTContext &Ctx) const {
+  return hasGlobalStorage() && (hasAttr<NoDestroyAttr>() ||
+                                (!Ctx.getLangOpts().RegisterStaticDestructors &&
+                                 !hasAttr<AlwaysDestroyAttr>()));
 }
 
 MemberSpecializationInfo *VarDecl::getMemberSpecializationInfo() const {

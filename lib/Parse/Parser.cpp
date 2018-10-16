@@ -674,6 +674,9 @@ Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
   case tok::annot_pragma_fp_contract:
     HandlePragmaFPContract();
     return nullptr;
+  case tok::annot_pragma_fenv_access:
+    HandlePragmaFEnvAccess();
+    return nullptr;
   case tok::annot_pragma_fp:
     HandlePragmaFP();
     break;
@@ -1962,6 +1965,10 @@ void Parser::CodeCompleteMacroArgument(IdentifierInfo *Macro,
                                        unsigned ArgumentIndex) {
   Actions.CodeCompletePreprocessorMacroArgument(getCurScope(), Macro, MacroInfo,
                                                 ArgumentIndex);
+}
+
+void Parser::CodeCompleteIncludedFile(llvm::StringRef Dir, bool IsAngled) {
+  Actions.CodeCompleteIncludedFile(Dir, IsAngled);
 }
 
 void Parser::CodeCompleteNaturalLanguage() {
