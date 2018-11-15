@@ -276,7 +276,7 @@ static void addHeaderInclude(StringRef HeaderName,
                              bool IsExternC) {
   if (IsExternC && LangOpts.CPlusPlus)
     Includes += "extern \"C\" {\n";
-  if (LangOpts.ObjC1)
+  if (LangOpts.ObjC)
     Includes += "#import \"";
   else
     Includes += "#include \"";
@@ -568,7 +568,7 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
       auto &MM = ASTReader->getModuleManager();
       auto &PrimaryModule = MM.getPrimaryModule();
 
-      for (ModuleFile &MF : MM)
+      for (serialization::ModuleFile &MF : MM)
         if (&MF != &PrimaryModule)
           CI.getFrontendOpts().ModuleFiles.push_back(MF.FileName);
 

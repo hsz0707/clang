@@ -81,6 +81,7 @@
 #include <utility>
 #if LLVM_ON_UNIX
 #include <unistd.h> // getpid
+#include <sysexits.h> // EX_IOERR
 #endif
 
 using namespace clang::driver;
@@ -485,12 +486,25 @@ static llvm::Triple computeTargetTriple(const Driver &D,
   // If target is MIPS adjust the target triple
   // accordingly to provided ABI name.
   A = Args.getLastArg(options::OPT_mabi_EQ);
-  if (A && Target.isMIPS())
-    Target = llvm::StringSwitch<llvm::Triple>(A->getValue())
-                 .Case("32", Target.get32BitArchVariant())
-                 .Case("n32", Target.get64BitArchVariant())
-                 .Case("64", Target.get64BitArchVariant())
-                 .Default(Target);
+  if (A && Target.isMIPS()) {
+    StringRef ABIName = A->getValue();
+    if (ABIName == "32") {
+      Target = Target.get32BitArchVariant();
+      if (Target.getEnvironment() == llvm::Triple::GNUABI64 ||
+          Target.getEnvironment() == llvm::Triple::GNUABIN32)
+        Target.setEnvironment(llvm::Triple::GNU);
+    } else if (ABIName == "n32") {
+      Target = Target.get64BitArchVariant();
+      if (Target.getEnvironment() == llvm::Triple::GNU ||
+          Target.getEnvironment() == llvm::Triple::GNUABI64)
+        Target.setEnvironment(llvm::Triple::GNUABIN32);
+    } else if (ABIName == "64") {
+      Target = Target.get64BitArchVariant();
+      if (Target.getEnvironment() == llvm::Triple::GNU ||
+          Target.getEnvironment() == llvm::Triple::GNUABIN32)
+        Target.setEnvironment(llvm::Triple::GNUABI64);
+    }
+  }
 
   return Target;
 }
@@ -1388,8 +1402,9 @@ int Driver::ExecuteCompilation(
 
   // Otherwise, remove result files and print extra information about abnormal
   // failures.
+  int Res = 0;
   for (const auto &CmdPair : FailingCommands) {
-    int Res = CmdPair.first;
+    int CommandRes = CmdPair.first;
     const Command *FailingCommand = CmdPair.second;
 
     // Remove result files if we're not saving temps.
@@ -1398,9 +1413,18 @@ int Driver::ExecuteCompilation(
       C.CleanupFileMap(C.getResultFiles(), JA, true);
 
       // Failure result files are valid unless we crashed.
-      if (Res < 0)
+      if (CommandRes < 0)
         C.CleanupFileMap(C.getFailureResultFiles(), JA, true);
     }
+
+#if LLVM_ON_UNIX
+    // llvm/lib/Support/Unix/Signals.inc will exit with a special return code
+    // for SIGPIPE. Do not print diagnostics for this case.
+    if (CommandRes == EX_IOERR) {
+      Res = CommandRes;
+      continue;
+    }
+#endif
 
     // Print extra information about abnormal failures, if possible.
     //
@@ -1411,17 +1435,17 @@ int Driver::ExecuteCompilation(
     // diagnostics, so always print the diagnostic there.
     const Tool &FailingTool = FailingCommand->getCreator();
 
-    if (!FailingCommand->getCreator().hasGoodDiagnostics() || Res != 1) {
+    if (!FailingCommand->getCreator().hasGoodDiagnostics() || CommandRes != 1) {
       // FIXME: See FIXME above regarding result code interpretation.
-      if (Res < 0)
+      if (CommandRes < 0)
         Diag(clang::diag::err_drv_command_signalled)
             << FailingTool.getShortName();
       else
-        Diag(clang::diag::err_drv_command_failed) << FailingTool.getShortName()
-                                                  << Res;
+        Diag(clang::diag::err_drv_command_failed)
+            << FailingTool.getShortName() << CommandRes;
     }
   }
-  return 0;
+  return Res;
 }
 
 void Driver::PrintHelp(bool ShowHidden) const {
@@ -1484,6 +1508,11 @@ void Driver::HandleAutocompletions(StringRef PassedFlags) const {
   unsigned short DisableFlags =
       options::NoDriverOption | options::Unsupported | options::Ignored;
 
+  // Distinguish "--autocomplete=-someflag" and "--autocomplete=-someflag,"
+  // because the latter indicates that the user put space before pushing tab
+  // which should end up in a file completion.
+  const bool HasSpace = PassedFlags.endswith(",");
+
   // Parse PassedFlags by "," as all the command-line flags are passed to this
   // function separated by ","
   StringRef TargetFlags = PassedFlags;
@@ -1510,7 +1539,19 @@ void Driver::HandleAutocompletions(StringRef PassedFlags) const {
   if (SuggestedCompletions.empty())
     SuggestedCompletions = Opts->suggestValueCompletions(Cur, "");
 
-  if (SuggestedCompletions.empty()) {
+  // If Flags were empty, it means the user typed `clang [tab]` where we should
+  // list all possible flags. If there was no value completion and the user
+  // pressed tab after a space, we should fall back to a file completion.
+  // We're printing a newline to be consistent with what we print at the end of
+  // this function.
+  if (SuggestedCompletions.empty() && HasSpace && !Flags.empty()) {
+    llvm::outs() << '\n';
+    return;
+  }
+
+  // When flag ends with '=' and there was no value completion, return empty
+  // string and fall back to the file autocompletion.
+  if (SuggestedCompletions.empty() && !Cur.endswith("=")) {
     // If the flag is in the form of "--autocomplete=-foo",
     // we were requested to print out all option names that start with "-foo".
     // For example, "--autocomplete=-fsyn" is expanded to "-fsyntax-only".
