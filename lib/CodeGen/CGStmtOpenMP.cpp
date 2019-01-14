@@ -385,12 +385,12 @@ static llvm::Function *emitOutlinedFunctionPrologue(
   FunctionDecl *DebugFunctionDecl = nullptr;
   if (!FO.UIntPtrCastRequired) {
     FunctionProtoType::ExtProtoInfo EPI;
+    QualType FunctionTy = Ctx.getFunctionType(Ctx.VoidTy, llvm::None, EPI);
     DebugFunctionDecl = FunctionDecl::Create(
         Ctx, Ctx.getTranslationUnitDecl(), FO.S->getBeginLoc(),
-        SourceLocation(), DeclarationName(), Ctx.VoidTy,
-        Ctx.getTrivialTypeSourceInfo(
-            Ctx.getFunctionType(Ctx.VoidTy, llvm::None, EPI)),
-        SC_Static, /*isInlineSpecified=*/false, /*hasWrittenPrototype=*/false);
+        SourceLocation(), DeclarationName(), FunctionTy,
+        Ctx.getTrivialTypeSourceInfo(FunctionTy), SC_Static,
+        /*isInlineSpecified=*/false, /*hasWrittenPrototype=*/false);
   }
   for (const FieldDecl *FD : RD->fields()) {
     QualType ArgType = FD->getType();
@@ -2321,9 +2321,11 @@ bool CodeGenFunction::EmitOMPWorksharingLoop(
         Chunk = EmitScalarConversion(Chunk, ChunkExpr->getType(),
                                      S.getIterationVariable()->getType(),
                                      S.getBeginLoc());
-        llvm::APSInt EvaluatedChunk;
-        if (ChunkExpr->EvaluateAsInt(EvaluatedChunk, getContext()))
+        Expr::EvalResult Result;
+        if (ChunkExpr->EvaluateAsInt(Result, getContext())) {
+          llvm::APSInt EvaluatedChunk = Result.Val.getInt();
           HasChunkSizeOne = (EvaluatedChunk.getLimitedValue() == 1);
+        }
       }
       const unsigned IVSize = getContext().getTypeSize(IVExpr->getType());
       const bool IVSigned = IVExpr->getType()->hasSignedIntegerRepresentation();
@@ -2953,7 +2955,7 @@ void CodeGenFunction::EmitOMPTaskBasedDirective(
         RedCG.emitAggregateType(CGF, Cnt);
         // FIXME: This must removed once the runtime library is fixed.
         // Emit required threadprivate variables for
-        // initilizer/combiner/finalizer.
+        // initializer/combiner/finalizer.
         CGF.CGM.getOpenMPRuntime().emitTaskReductionFixups(CGF, S.getBeginLoc(),
                                                            RedCG, Cnt);
         Address Replacement = CGF.CGM.getOpenMPRuntime().getTaskReductionItem(
@@ -2999,10 +3001,10 @@ void CodeGenFunction::EmitOMPTaskBasedDirective(
         RedCG.emitSharedLValue(CGF, Cnt);
         RedCG.emitAggregateType(CGF, Cnt);
         // The taskgroup descriptor variable is always implicit firstprivate and
-        // privatized already during procoessing of the firstprivates.
+        // privatized already during processing of the firstprivates.
         // FIXME: This must removed once the runtime library is fixed.
         // Emit required threadprivate variables for
-        // initilizer/combiner/finalizer.
+        // initializer/combiner/finalizer.
         CGF.CGM.getOpenMPRuntime().emitTaskReductionFixups(CGF, S.getBeginLoc(),
                                                            RedCG, Cnt);
         llvm::Value *ReductionsPtr =
