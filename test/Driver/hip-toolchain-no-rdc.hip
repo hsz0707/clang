@@ -20,6 +20,7 @@
 // CHECK-SAME: "-aux-triple" "x86_64-unknown-linux-gnu" "-emit-llvm-bc"
 // CHECK-SAME: {{.*}} "-main-file-name" "a.cu" {{.*}} "-target-cpu" "gfx803"
 // CHECK-SAME: "-fcuda-is-device" "-fvisibility" "hidden"
+// CHECK-SAME: "-fapply-global-visibility-to-externs"
 // CHECK-SAME: {{.*}} "-o" [[A_BC_803:".*bc"]] "-x" "hip"
 // CHECK-SAME: {{.*}} [[A_SRC:".*a.cu"]]
 
@@ -33,7 +34,6 @@
 
 // CHECK: [[LLC: ".*llc"]] [[OPT_BC_DEV_A_803]] "-mtriple=amdgcn-amd-amdhsa"
 // CHECK-SAME: "-filetype=obj"
-// CHECK-SAME: "-mattr=-code-object-v3"
 // CHECK-SAME: "-mcpu=gfx803" "-o" [[OBJ_DEV_A_803:".*-gfx803-.*o"]]
 
 // CHECK: [[LLD: ".*lld"]] "-flavor" "gnu" "--no-undefined" "-shared"
@@ -47,6 +47,7 @@
 // CHECK-SAME: "-aux-triple" "x86_64-unknown-linux-gnu" "-emit-llvm-bc"
 // CHECK-SAME: {{.*}} "-main-file-name" "a.cu" {{.*}} "-target-cpu" "gfx900"
 // CHECK-SAME: "-fcuda-is-device" "-fvisibility" "hidden"
+// CHECK-SAME: "-fapply-global-visibility-to-externs"
 // CHECK-SAME: {{.*}} "-o" [[A_BC_900:".*bc"]] "-x" "hip"
 // CHECK-SAME: {{.*}} [[A_SRC]]
 
@@ -60,7 +61,6 @@
 
 // CHECK: [[LLC: ".*llc"]] [[OPT_BC_DEV_A_900]] "-mtriple=amdgcn-amd-amdhsa"
 // CHECK-SAME: "-filetype=obj"
-// CHECK-SAME: "-mattr=-code-object-v3"
 // CHECK-SAME: "-mcpu=gfx900" "-o" [[OBJ_DEV_A_900:".*-gfx900-.*o"]]
 
 // CHECK: [[LLD: ".*lld"]] "-flavor" "gnu" "--no-undefined" "-shared"
@@ -89,6 +89,7 @@
 // CHECK-SAME: "-aux-triple" "x86_64-unknown-linux-gnu" "-emit-llvm-bc"
 // CHECK-SAME: {{.*}} "-main-file-name" "b.hip" {{.*}} "-target-cpu" "gfx803"
 // CHECK-SAME: "-fcuda-is-device" "-fvisibility" "hidden"
+// CHECK-SAME: "-fapply-global-visibility-to-externs"
 // CHECK-SAME: {{.*}} "-o" [[B_BC_803:".*bc"]] "-x" "hip"
 // CHECK-SAME: {{.*}} [[B_SRC:".*b.hip"]]
 
@@ -102,7 +103,6 @@
 
 // CHECK: [[LLC: ".*llc"]] [[OPT_BC_DEV_B_803]] "-mtriple=amdgcn-amd-amdhsa"
 // CHECK-SAME: "-filetype=obj"
-// CHECK-SAME: "-mattr=-code-object-v3"
 // CHECK-SAME: "-mcpu=gfx803" "-o" [[OBJ_DEV_B_803:".*-gfx803-.*o"]]
 
 // CHECK: [[LLD: ".*lld"]] "-flavor" "gnu" "--no-undefined" "-shared"
@@ -116,6 +116,7 @@
 // CHECK-SAME: "-aux-triple" "x86_64-unknown-linux-gnu" "-emit-llvm-bc"
 // CHECK-SAME: {{.*}} "-main-file-name" "b.hip" {{.*}} "-target-cpu" "gfx900"
 // CHECK-SAME: "-fcuda-is-device" "-fvisibility" "hidden"
+// CHECK-SAME: "-fapply-global-visibility-to-externs"
 // CHECK-SAME: {{.*}} "-o" [[B_BC_900:".*bc"]] "-x" "hip"
 // CHECK-SAME: {{.*}} [[B_SRC]]
 
@@ -129,7 +130,6 @@
 
 // CHECK: [[LLC: ".*llc"]] [[OPT_BC_DEV_B_900]] "-mtriple=amdgcn-amd-amdhsa"
 // CHECK-SAME: "-filetype=obj"
-// CHECK-SAME: "-mattr=-code-object-v3"
 // CHECK-SAME: "-mcpu=gfx900" "-o" [[OBJ_DEV_B_900:".*-gfx900-.*o"]]
 
 // CHECK: [[LLD: ".*lld"]] "-flavor" "gnu" "--no-undefined" "-shared"

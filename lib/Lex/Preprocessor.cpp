@@ -1,9 +1,8 @@
 //===- Preprocess.cpp - C Language Family Preprocessor Implementation -----===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
@@ -567,7 +566,8 @@ void Preprocessor::EnterMainSourceFile() {
         SourceLocation(), PPOpts->PCHThroughHeader,
         /*isAngled=*/false, /*FromDir=*/nullptr, /*FromFile=*/nullptr, CurDir,
         /*SearchPath=*/nullptr, /*RelativePath=*/nullptr,
-        /*SuggestedModule=*/nullptr, /*IsMapped=*/nullptr);
+        /*SuggestedModule=*/nullptr, /*IsMapped=*/nullptr,
+        /*IsFrameworkFound=*/nullptr);
     if (!File) {
       Diag(SourceLocation(), diag::err_pp_through_header_not_found)
           << PPOpts->PCHThroughHeader;

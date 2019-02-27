@@ -1,9 +1,8 @@
 //===--- IndexTests.cpp - Test indexing actions -----------------*- C++ -*-===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -118,6 +117,21 @@ TEST(IndexTest, IndexPreprocessorMacros) {
   Index->Symbols.clear();
   tooling::runToolOnCode(new IndexAction(Index, Opts), Code);
   EXPECT_THAT(Index->Symbols, UnorderedElementsAre());
+}
+
+TEST(IndexTest, IndexParametersInDecls) {
+  std::string Code = "void foo(int bar);";
+  auto Index = std::make_shared<Indexer>();
+  IndexingOptions Opts;
+  Opts.IndexFunctionLocals = true;
+  Opts.IndexParametersInDeclarations = true;
+  tooling::runToolOnCode(new IndexAction(Index, Opts), Code);
+  EXPECT_THAT(Index->Symbols, Contains(QName("bar")));
+
+  Opts.IndexParametersInDeclarations = false;
+  Index->Symbols.clear();
+  tooling::runToolOnCode(new IndexAction(Index, Opts), Code);
+  EXPECT_THAT(Index->Symbols, Not(Contains(QName("bar"))));
 }
 
 } // namespace
