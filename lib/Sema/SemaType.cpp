@@ -1442,10 +1442,7 @@ static QualType ConvertDeclSpecToType(TypeProcessingState &state) {
       Result = Context.Int128Ty;
     break;
   case DeclSpec::TST_float16:
-    // CUDA host and device may have different _Float16 support, therefore
-    // do not diagnose _Float16 usage to avoid false alarm.
-    // ToDo: more precise diagnostics for CUDA.
-    if (!S.Context.getTargetInfo().hasFloat16Type() && !S.getLangOpts().CUDA)
+    if (!S.Context.getTargetInfo().hasFloat16Type())
       S.Diag(DS.getTypeSpecTypeLoc(), diag::err_type_unsupported)
         << "_Float16";
     Result = Context.Float16Ty;
